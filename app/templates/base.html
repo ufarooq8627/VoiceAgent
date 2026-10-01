@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Recruitment Agent{% endblock %}</title>
+    <!-- Google Fonts: Inter -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <!-- HTMX -->
+    <script src="https://unpkg.com/htmx.org@1.9.10"></script>
+    <!-- Main Style -->
+    <link rel="stylesheet" href="/static/css/style.css">
+    {% block head %}{% endblock %}
+</head>
+<body hx-boost="true">
+    <div class="app-container">
+        <!-- Sidebar -->
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <div class="brand-icon">⚡</div>
+                <div>
+                    <div class="brand-title">Recruitment</div>
+                    <span class="brand-badge">Agentic AI</span>
+                </div>
+            </div>
+
+            <nav class="sidebar-nav">
+                <a href="/admin/" class="nav-link {% if active_nav == 'jobs' %}active{% endif %}">
+                    <span class="nav-icon">💼</span>
+                    <span>Jobs & Candidates</span>
+                </a>
+                <a href="/admin/interviewers" class="nav-link {% if active_nav == 'interviewers' %}active{% endif %}">
+                    <span class="nav-icon">👥</span>
+                    <span>Interviewers</span>
+                </a>
+                <a href="/admin/mock-inbox" class="nav-link {% if active_nav == 'inbox' %}active{% endif %}">
+                    <span class="nav-icon">📥</span>
+                    <span>Mock Inbox</span>
+                </a>
+            </nav>
+
+            <div class="sidebar-footer">
+                <div class="user-info">
+                    <div class="user-avatar">👤</div>
+                    <div style="font-size: 0.85rem; font-weight: 500;">Admin</div>
+                </div>
+                <a href="/admin/logout" class="btn btn-outline btn-sm" title="Log out">Logout</a>
+            </div>
+        </aside>
+
+        <!-- Main Content Area -->
+        <main class="main-content">
+            <header class="topbar">
+                <h1 class="page-title">{% block page_title %}Dashboard{% endblock %}</h1>
+                <div class="topbar-actions">
+                    {% block topbar_actions %}{% endblock %}
+                </div>
+            </header>
+
+            <div class="content-body" id="main-content-body">
+                {% block content %}{% endblock %}
+            </div>
+        </main>
+    </div>
+
+    <!-- Toast Notifications Container -->
+    <div id="toast-container" class="toast-container"></div>
+
+    <script src="/static/js/app.js"></script>
+    {% block scripts %}{% endblock %}
+</body>
+</html>
