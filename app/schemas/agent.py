@@ -1,18 +1,23 @@
 from typing import Literal
-from pydantic import BaseModel, model_validator
+from pydantic import BaseModel, Field, model_validator
 
 
 class AgentDecision(BaseModel):
-    intent: Literal["choose", "decline", "none_fit", "unclear"]
+    intent: Literal["choose", "decline", "none_fit", "unclear", "question"]
     slot_label: str | None = None
-    decline_reason: str | None = None
-    follow_up_message: str | None = None
-    confidence: float
+    confidence: float = Field(ge=0.0, le=1.0)
+    reason: str = Field(default="", max_length=300)   # short audit note, never shown to candidate
+    decline_reason: str | None = None                 # backwards compatibility
+    follow_up_message: str | None = None              # backwards compatibility
 
     @model_validator(mode="after")
-    def validate_slot_required(self):
-        if self.intent == "choose" and not self.slot_label:
-            raise ValueError("slot_label required when intent is 'choose'")
+    def _check(self):
+        if self.intent == "choose":
+            if not self.slot_label or not self.slot_label.strip():
+                raise ValueError("slot_label required for choose")
+            self.slot_label = self.slot_label.strip().upper()[:2]
+        else:
+            self.slot_label = None
         return self
 
 
