@@ -1,30 +1,19 @@
 from sqlalchemy.orm import Session
-from app.models import InboundMessage, CandidateEvent, ConversationMessage
+from app.models import InboundMessage
+from app.providers.llm_provider import get_llm_provider, BaseLLMProvider
+from app.agent.loop import process_candidate_messages
 
 
 class AgentService:
     @staticmethod
-    def process_reply(db: Session, message_id: str) -> None:
-        msg = db.query(InboundMessage).filter(InboundMessage.id == message_id).first()
-        if not msg or msg.processed:
+    def process_reply(
+        db: Session,
+        inbound_message_id: str,
+        provider: BaseLLMProvider | None = None,
+    ) -> None:
+        msg = db.query(InboundMessage).filter(InboundMessage.id == inbound_message_id).first()
+        if not msg or not msg.candidate_id:
             return
-
-        msg.processed = True
-        if msg.candidate_id:
-            event = CandidateEvent(
-                candidate_id=msg.candidate_id,
-                event_type="reply_received",
-                actor="system",
-                payload={"body": msg.body_text, "note": "LLM agent not active (Phase 1)"},
-            )
-            db.add(event)
-
-            conv = ConversationMessage(
-                candidate_id=msg.candidate_id,
-                direction="inbound",
-                inbound_id=msg.id,
-                summary=f"Candidate replied: {msg.body_text[:100]}",
-            )
-            db.add(conv)
-
-        db.commit()
+        if provider is None:
+            provider = get_llm_provider()
+        process_candidate_messages(db, msg.candidate_id, provider)
