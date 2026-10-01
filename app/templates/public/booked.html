@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Interview Confirmed!</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', -apple-system, sans-serif;
+            background-color: #f8fafc;
+            color: #0f172a;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            padding: 1.5rem;
+        }
+        .card {
+            background: white;
+            max-width: 520px;
+            width: 100%;
+            border-radius: 16px;
+            padding: 3rem 2rem;
+            text-align: center;
+            box-shadow: 0 10px 25px -5px rgba(0,0,0,0.05);
+            border: 1px solid #e2e8f0;
+        }
+        .icon { font-size: 3.5rem; margin-bottom: 1rem; }
+        h1 { font-size: 1.6rem; font-weight: 700; margin-bottom: 0.5rem; }
+        p { color: #64748b; font-size: 0.95rem; margin-bottom: 1.5rem; }
+        .details {
+            background: #f1f5f9;
+            border-radius: 12px;
+            padding: 1.25rem;
+            text-align: left;
+            font-size: 0.9rem;
+            margin-bottom: 1.5rem;
+        }
+    </style>
+</head>
+<body>
+    <div class="card">
+        <div class="icon">🎉</div>
+        <h1>Interview Confirmed!</h1>
+        <p>Your interview has been successfully scheduled. A confirmation email with meeting details has been sent to you.</p>
+
+        {% if slot %}
+        <div class="details">
+            <div><strong>Role:</strong> {{ job.title }}</div>
+            <div style="margin-top: 0.35rem;"><strong>Date & Time:</strong> {{ slot.start_at_utc.strftime('%b %d, %Y at %H:%M UTC') }}</div>
+            <div style="margin-top: 0.35rem;"><strong>Interviewer:</strong> {{ slot.interviewer.name if slot.interviewer else 'Panel' }}</div>
+            <div style="margin-top: 0.35rem;"><strong>Mode:</strong> {{ slot.mode }} ({{ slot.location_or_link or 'Video Call' }})</div>
+        </div>
+        {% endif %}
+
+        <p style="font-size: 0.85rem; color: #94a3b8;">You may close this window now.</p>
+    </div>
+</body>
+</html>

@@ -5,7 +5,7 @@ from starlette.middleware.sessions import SessionMiddleware
 
 from app.config import settings
 from app.database import Base, engine
-from app.routes import auth
+from app.routes import auth, admin, public, api
 from app.agent.worker import start_scheduler, stop_scheduler
 
 
@@ -34,6 +34,9 @@ app.mount("/static", StaticFiles(directory="app/static"), name="static")
 
 # Include Routers
 app.include_router(auth.router)
+app.include_router(admin.router)
+app.include_router(public.router)
+app.include_router(api.router)
 
 
 @app.get("/health")

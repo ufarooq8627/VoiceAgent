@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Schedule Your Interview — {{ job.title }}</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary: #2563eb;
+            --primary-hover: #1d4ed8;
+            --bg-page: #f8fafc;
+            --bg-card: #ffffff;
+            --text-main: #0f172a;
+            --text-muted: #64748b;
+            --border: #e2e8f0;
+            --success: #16a34a;
+            --danger: #dc2626;
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: 'Inter', -apple-system, sans-serif;
+            background-color: var(--bg-page);
+            color: var(--text-main);
+            line-height: 1.5;
+            padding: 2rem 1rem;
+            min-height: 100vh;
+        }
+        .container {
+            max-width: 640px;
+            margin: 0 auto;
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 2.5rem;
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.05);
+        }
+        .header { margin-bottom: 2rem; text-align: center; }
+        .logo { font-size: 2.5rem; margin-bottom: 0.5rem; }
+        .title { font-size: 1.5rem; font-weight: 700; margin-bottom: 0.5rem; }
+        .subtitle { color: var(--text-muted); font-size: 0.95rem; }
+        .candidate-badge {
+            display: inline-block;
+            background: #eff6ff;
+            color: var(--primary);
+            padding: 0.4rem 1rem;
+            border-radius: 9999px;
+            font-size: 0.85rem;
+            font-weight: 600;
+            margin-top: 0.5rem;
+        }
+        .slot-card {
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 1.25rem;
+            margin-bottom: 1rem;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            transition: all 150ms ease;
+        }
+        .slot-card:hover {
+            border-color: var(--primary);
+            background-color: #f8faff;
+        }
+        .btn-book {
+            background-color: var(--primary);
+            color: white;
+            border: none;
+            padding: 0.6rem 1.25rem;
+            border-radius: 8px;
+            font-weight: 600;
+            font-size: 0.875rem;
+            cursor: pointer;
+            transition: background 150ms ease;
+        }
+        .btn-book:hover { background-color: var(--primary-hover); }
+        .footer-actions {
+            margin-top: 2rem;
+            padding-top: 1.5rem;
+            border-top: 1px solid var(--border);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .btn-decline {
+            color: var(--danger);
+            background: none;
+            border: none;
+            cursor: pointer;
+            font-size: 0.875rem;
+            font-weight: 500;
+            text-decoration: underline;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="logo">📅</div>
+            <h1 class="title">Interview Invitation</h1>
+            <p class="subtitle">Please pick a convenient time for your <strong>{{ job.title }}</strong> interview.</p>
+            <div class="candidate-badge">Candidate: {{ candidate.name }}</div>
+        </div>
+
+        {% if error %}
+        <div style="background: #fef2f2; color: var(--danger); border: 1px solid #fecaca; padding: 0.75rem 1rem; border-radius: 8px; margin-bottom: 1.5rem; font-size: 0.9rem;">
+            {{ error }}
+        </div>
+        {% endif %}
+
+        <h3 style="font-size: 1.05rem; font-weight: 600; margin-bottom: 1rem;">Available Interview Slots</h3>
+
+        {% if not available_slots %}
+        <div style="text-align: center; padding: 2.5rem 1rem; color: var(--text-muted);">
+            <p style="font-size: 1.1rem; margin-bottom: 0.5rem;">All slots are currently booked.</p>
+            <p style="font-size: 0.9rem;">Our team has been notified and will reach out with more dates shortly.</p>
+        </div>
+        {% else %}
+        {% for s in available_slots %}
+        <div class="slot-card">
+            <div>
+                <div style="font-weight: 700; font-size: 1.05rem;">Slot {{ s.label }}: {{ s.date }}</div>
+                <div style="color: var(--text-muted); font-size: 0.875rem;">
+                    {{ s.start_time }} to {{ s.end_time }} • Interviewer: {{ s.interviewer_name }}
+                </div>
+                <div style="font-size: 0.8rem; color: #16a34a; font-weight: 500; margin-top: 0.25rem;">
+                    ✓ Mode: {{ s.mode }}
+                </div>
+            </div>
+            <form method="POST" action="/i/{{ token }}/book">
+                <input type="hidden" name="slot_id" value="{{ s.id }}">
+                <button type="submit" class="btn-book">Select Slot</button>
+            </form>
+        </div>
+        {% endfor %}
+        {% endif %}
+
+        <div class="footer-actions">
+            <span style="font-size: 0.85rem; color: var(--text-muted);">Cannot attend these dates?</span>
+            <form method="POST" action="/i/{{ token }}/decline" onsubmit="return confirm('Are you sure you wish to decline?')">
+                <button type="submit" class="btn-decline">I decline this interview</button>
+            </form>
+        </div>
+    </div>
+</body>
+</html>

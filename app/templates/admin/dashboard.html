@@ -1,0 +1,97 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard — Recruitment Agent{% endblock %}
+{% block page_title %}Job Campaigns{% endblock %}
+
+{% block topbar_actions %}
+<button class="btn btn-primary" onclick="document.getElementById('new-job-modal').style.display = 'flex'">
+    <span>+</span>
+    <span>Create Job</span>
+</button>
+{% endblock %}
+
+{% block content %}
+<div class="jobs-dashboard">
+    {% if not jobs %}
+    <div class="card" style="text-align: center; padding: 4rem 2rem;">
+        <div style="font-size: 3rem; margin-bottom: 1rem;">💼</div>
+        <h2 style="font-size: 1.35rem; font-weight: 600; margin-bottom: 0.5rem;">No job campaigns yet</h2>
+        <p class="text-muted" style="max-width: 440px; margin: 0 auto 1.5rem;">
+            Create your first job posting to start receiving candidates and orchestrating interview scheduling with the AI agent.
+        </p>
+        <button class="btn btn-primary" onclick="document.getElementById('new-job-modal').style.display = 'flex'">
+            Create Your First Job
+        </button>
+    </div>
+    {% else %}
+    <div class="grid-3">
+        {% for item in jobs %}
+        <div class="card job-card" style="display: flex; flex-direction: column; justify-content: space-between;">
+            <div>
+                <div class="card-header">
+                    <span class="badge badge-{{ item.job.status }}">{{ item.job.status }}</span>
+                    <span class="text-muted text-sm">{{ item.job.created_at.strftime('%b %d, %Y') }}</span>
+                </div>
+                <h2 style="font-size: 1.2rem; font-weight: 700; margin-bottom: 0.65rem;">
+                    <a href="/admin/jobs/{{ item.job.id }}">{{ item.job.title }}</a>
+                </h2>
+                <p class="text-muted text-sm" style="margin-bottom: 1.5rem; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;">
+                    {{ item.job.description }}
+                </p>
+            </div>
+
+            <div>
+                <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.5rem; background: var(--bg-surface); padding: 0.75rem; border-radius: var(--radius-md); margin-bottom: 1.25rem; text-align: center;">
+                    <div>
+                        <div class="text-muted" style="font-size: 0.7rem; text-transform: uppercase;">Total</div>
+                        <div style="font-weight: 700; font-size: 1.1rem;">{{ item.counts.total }}</div>
+                    </div>
+                    <div>
+                        <div style="font-size: 0.7rem; color: var(--status-shortlisted); text-transform: uppercase;">Shortlist</div>
+                        <div style="font-weight: 700; font-size: 1.1rem; color: var(--status-shortlisted);">{{ item.counts.shortlisted }}</div>
+                    </div>
+                    <div>
+                        <div style="font-size: 0.7rem; color: var(--status-invited); text-transform: uppercase;">Invited</div>
+                        <div style="font-weight: 700; font-size: 1.1rem; color: var(--status-invited);">{{ item.counts.invited }}</div>
+                    </div>
+                    <div>
+                        <div style="font-size: 0.7rem; color: var(--status-booked); text-transform: uppercase;">Booked</div>
+                        <div style="font-weight: 700; font-size: 1.1rem; color: var(--status-booked);">{{ item.counts.booked }}</div>
+                    </div>
+                </div>
+
+                <div class="flex-between">
+                    <span class="text-sm text-muted">Open Slots: <strong>{{ item.open_slots_count }}</strong></span>
+                    <a href="/admin/jobs/{{ item.job.id }}" class="btn btn-outline btn-sm">Manage Job →</a>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+</div>
+
+<!-- Create Job Modal -->
+<div id="new-job-modal" class="modal-backdrop" style="display: none;">
+    <div class="modal-dialog">
+        <div class="card-header">
+            <h2 class="card-title">Create Job Campaign</h2>
+            <button class="btn btn-outline btn-sm" onclick="document.getElementById('new-job-modal').style.display = 'none'">✕</button>
+        </div>
+        <form method="POST" action="/admin/jobs">
+            <div class="form-group">
+                <label class="form-label" for="title">Job Title</label>
+                <input class="form-input" type="text" id="title" name="title" placeholder="e.g. Senior Backend Engineer" required>
+            </div>
+            <div class="form-group">
+                <label class="form-label" for="description">Job Description</label>
+                <textarea class="form-textarea" id="description" name="description" placeholder="Requirements, key responsibilities, tech stack..." required></textarea>
+            </div>
+            <div style="display: flex; justify-content: flex-end; gap: 0.75rem; margin-top: 1.5rem;">
+                <button type="button" class="btn btn-secondary" onclick="document.getElementById('new-job-modal').style.display = 'none'">Cancel</button>
+                <button type="submit" class="btn btn-primary">Create Campaign</button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}

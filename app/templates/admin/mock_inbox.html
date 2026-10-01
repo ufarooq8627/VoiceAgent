@@ -1,0 +1,127 @@
+{% extends "base.html" %}
+
+{% block title %}Mock Candidate Inbox — Recruitment Agent{% endblock %}
+{% block page_title %}Candidate Reply Simulator (Mock Inbox){% endblock %}
+
+{% block content %}
+<div class="mock-inbox-page">
+    <div style="background: hsla(221, 83%, 58%, 0.1); border: 1px solid hsla(221, 83%, 58%, 0.3); padding: 1rem 1.25rem; border-radius: var(--radius-md); margin-bottom: 2rem;">
+        <h4 style="font-weight: 600; color: var(--primary); margin-bottom: 0.25rem;">Developer Testing Utility (Phase 1)</h4>
+        <p class="text-sm text-secondary">
+            Simulate candidates replying to their invitation emails. The message is saved directly as an <code>InboundMessage</code> and processed during the agent loop worker tick (every {{ tick_interval }}s).
+        </p>
+    </div>
+
+    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 2rem; align-items: start;">
+        <!-- Left: Reply Form -->
+        <div class="card">
+            <h3 class="card-title" style="margin-bottom: 1.25rem;">Simulate Inbound Candidate Email</h3>
+            <form method="POST" action="/admin/mock-inbox/simulate">
+                <div class="form-group">
+                    <label class="form-label" for="candidate_id">Candidate</label>
+                    <select class="form-select" id="candidate_id" name="candidate_id" onchange="updateCandidateEmail(this)" required>
+                        <option value="">-- Choose Candidate --</option>
+                        {% for c in candidates %}
+                        <option value="{{ c.id }}" data-email="{{ c.email }}">
+                            {{ c.name }} ({{ c.status }}) — {{ c.job.title if c.job else '' }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label" for="from_address">From Address</label>
+                    <input class="form-input" type="email" id="from_address" name="from_address" placeholder="candidate@example.com" required>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label" for="subject">Subject</label>
+                    <input class="form-input" type="text" id="subject" name="subject" value="Re: Interview Invitation" required>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label" for="body_text">Candidate Reply Body</label>
+                    <textarea class="form-textarea" id="body_text" name="body_text" style="min-height: 120px;" placeholder="e.g. Hi, I would like to book slot A please." required></textarea>
+                </div>
+
+                <!-- Quick Preset buttons -->
+                <div style="margin-bottom: 1.5rem;">
+                    <span class="text-muted text-sm" style="display: block; margin-bottom: 0.4rem;">Quick simulation presets:</span>
+                    <div style="display: flex; flex-wrap: wrap; gap: 0.4rem;">
+                        <button type="button" class="btn btn-outline btn-sm" onclick="setPreset('I would like to book slot A please.')">Slot A Choice</button>
+                        <button type="button" class="btn btn-outline btn-sm" onclick="setPreset('Slot B works best for me, thanks!')">Slot B Choice</button>
+                        <button type="button" class="btn btn-outline btn-sm" onclick="setPreset('Unfortunately none of these times fit my current work schedule.')">None Fit</button>
+                        <button type="button" class="btn btn-outline btn-sm" onclick="setPreset('Thanks for reaching out, but I have accepted another offer.')">Decline</button>
+                    </div>
+                </div>
+
+                <button type="submit" class="btn btn-primary" style="width: 100%;">
+                    📨 Simulate Inbound Email
+                </button>
+            </form>
+        </div>
+
+        <!-- Right: Recent Inbound Messages -->
+        <div>
+            <h3 class="card-title" style="margin-bottom: 1rem;">Recent Inbound Messages</h3>
+            <div class="table-container">
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>From</th>
+                            <th>Message</th>
+                            <th>Status</th>
+                            <th>Received</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% if not recent_messages %}
+                        <tr>
+                            <td colspan="4" style="text-align: center; padding: 2rem;" class="text-muted">
+                                No simulated inbound emails yet.
+                            </td>
+                        </tr>
+                        {% else %}
+                        {% for msg in recent_messages %}
+                        <tr>
+                            <td>
+                                <div style="font-weight: 600;">{{ msg.candidate.name if msg.candidate else msg.from_address }}</div>
+                                <div class="text-muted text-sm">{{ msg.from_address }}</div>
+                            </td>
+                            <td>
+                                <div style="font-size: 0.85rem; max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+                                    {{ msg.body_text }}
+                                </div>
+                            </td>
+                            <td>
+                                {% if msg.processed %}
+                                <span class="badge badge-booked">Processed</span>
+                                {% else %}
+                                <span class="badge badge-invited">Queued</span>
+                                {% endif %}
+                            </td>
+                            <td class="text-muted text-sm">{{ msg.received_at.strftime('%H:%M:%S UTC') }}</td>
+                        </tr>
+                        {% endfor %}
+                        {% endif %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function updateCandidateEmail(selectEl) {
+    const selected = selectEl.options[selectEl.selectedIndex];
+    const email = selected.getAttribute("data-email");
+    if (email) {
+        document.getElementById("from_address").value = email;
+    }
+}
+
+function setPreset(text) {
+    document.getElementById("body_text").value = text;
+}
+</script>
+{% endblock %}
