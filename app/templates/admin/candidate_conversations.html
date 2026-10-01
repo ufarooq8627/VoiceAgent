@@ -10,55 +10,5 @@
 {% endblock %}
 
 {% block content %}
-<div class="candidate-history-page" style="max-width: 900px; margin: 0 auto;">
-    <!-- Profile Card -->
-    <div class="card mb-4">
-        <div class="flex-between">
-            <div>
-                <h2 style="font-size: 1.35rem; font-weight: 700; margin-bottom: 0.25rem;">{{ candidate.name }}</h2>
-                <div class="text-muted text-sm">{{ candidate.email }} • {{ candidate.phone or 'No phone' }}</div>
-                <div class="text-muted text-sm mt-2">
-                    Applied for: <strong>{{ candidate.job.title if candidate.job else '' }}</strong> | Experience: <strong>{{ candidate.experience_years }} yrs</strong>
-                </div>
-            </div>
-            <div style="text-align: right;">
-                <span class="badge badge-{{ candidate.status.lower() }}" style="font-size: 0.9rem; padding: 0.35rem 0.85rem;">
-                    {{ candidate.status }}
-                </span>
-                <div class="text-muted text-sm mt-2">Source: {{ candidate.source }}</div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Timeline of Conversations and Events -->
-    <h3 style="font-size: 1.15rem; font-weight: 600; margin-bottom: 1.25rem;">Conversation Thread & Audit Events</h3>
-
-    {% if not messages and not events %}
-    <div class="card text-center" style="padding: 3rem;">
-        <p class="text-muted">No communication recorded yet for this candidate.</p>
-    </div>
-    {% else %}
-    <div style="display: flex; flex-direction: column; gap: 1rem;">
-        {% for m in messages %}
-        <div class="card" style="border-left: 4px solid {% if m.direction == 'outbound' %}var(--primary){% else %}var(--status-booked){% endif %};">
-            <div class="flex-between mb-2">
-                <span style="font-weight: 600; color: {% if m.direction == 'outbound' %}var(--primary){% else %}var(--status-booked){% endif %};">
-                    {% if m.direction == 'outbound' %}↗ Email Sent to Candidate{% else %}↙ Reply Received from Candidate{% endif %}
-                </span>
-                <span class="text-muted text-sm">{{ m.created_at.strftime('%b %d, %Y at %H:%M:%S UTC') }}</span>
-            </div>
-            <p style="font-size: 0.95rem;">{{ m.summary }}</p>
-        </div>
-        {% endfor %}
-
-        {% for ev in events %}
-        <div style="display: flex; align-items: center; gap: 0.75rem; padding: 0.5rem 1rem; background: var(--bg-surface); border-radius: var(--radius-md); font-size: 0.85rem;">
-            <span style="color: var(--status-shortlisted);">⚡</span>
-            <span>Lifecycle event: <strong>{{ ev.event_type }}</strong> by <em>{{ ev.actor }}</em></span>
-            <span class="text-muted" style="margin-left: auto;">{{ ev.created_at.strftime('%H:%M:%S UTC') }}</span>
-        </div>
-        {% endfor %}
-    </div>
-    {% endif %}
-</div>
+{% include "admin/candidate_conversations_partial.html" %}
 {% endblock %}

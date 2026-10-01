@@ -312,6 +312,98 @@ async def mock_inbox_simulate(
     return RedirectResponse(url="/admin/mock-inbox", status_code=303)
 
 
+@router.post("/candidates/{id}/reinvite")
+async def reinvite_candidate(
+    request: Request,
+    id: str,
+    db: Session = Depends(get_db),
+):
+    cand = db.query(Candidate).filter(Candidate.id == id).first()
+    if not cand:
+        raise HTTPException(status_code=404, detail="Candidate not found")
+
+    # 1. State transition from current status (NEEDS_RECRUITER) -> INVITED with actor="recruiter"
+    transition_candidate(
+        db,
+        cand.id,
+        CandidateStatus.INVITED,
+        actor="recruiter",
+        payload={"reason": "Recruiter reinvitation"},
+        commit=False,
+    )
+
+    # 2. Fresh invitation and slot snapshot
+    invitation, raw_token = InvitationService.create_invitation(db, cand.id)
+    open_slots = SlotService.get_available(db, cand.job_id)[:5]
+    offered_map = {s["label"]: s["id"] for s in open_slots}
+
+    slots_text = "\n".join(
+        f"Option {s['label']}: {s['date']} from {s['start_time']} to {s['end_time']}"
+        for s in open_slots
+    )
+    slots_html = "".join(
+        f"<li><strong>Option {s['label']}:</strong> {s['date']} from {s['start_time']} to {s['end_time']}</li>"
+        for s in open_slots
+    )
+
+    base_url = str(request.base_url).rstrip("/")
+    booking_url = f"{base_url}/i/{raw_token}"
+    body_html = f"<p>Hi {cand.name},</p><p>We are following up regarding the {cand.job.title} role. Please reply to this email with your chosen option or visit <a href='{booking_url}'>{booking_url}</a>.</p><ul>{slots_html}</ul>"
+    body_text = f"Hi {cand.name},\n\nWe are following up regarding the {cand.job.title} role. Please reply with your chosen option or visit {booking_url}.\n\n{slots_text}"
+
+    EmailService.enqueue(
+        db,
+        candidate_id=cand.id,
+        kind="invitation",
+        to_address=cand.email,
+        subject=f"Interview Invitation: {cand.job.title}",
+        body_html=body_html,
+        body_text=body_text,
+        offered_slots=offered_map,
+        commit=False,
+    )
+    db.commit()
+
+    referer = request.headers.get("referer") or f"/admin/jobs/{cand.job_id}"
+    return RedirectResponse(url=referer, status_code=303)
+
+
+@router.post("/candidates/{id}/manual-book")
+async def manual_book_candidate(
+    request: Request,
+    id: str,
+    slot_id: str = Form(...),
+    db: Session = Depends(get_db),
+):
+    cand = db.query(Candidate).filter(Candidate.id == id).first()
+    if not cand:
+        raise HTTPException(status_code=404, detail="Candidate not found")
+
+    ok, res = SlotService.book(
+        db,
+        slot_id=slot_id,
+        candidate_id=id,
+        actor="recruiter",
+        commit=False,
+        transition=False,
+    )
+    if not ok:
+        raise HTTPException(status_code=400, detail=f"Booking failed: {res}")
+
+    transition_candidate(
+        db,
+        cand.id,
+        CandidateStatus.BOOKED,
+        actor="recruiter",
+        payload={"slot_id": slot_id, "manual": True},
+        commit=False,
+    )
+    db.commit()
+
+    referer = request.headers.get("referer") or f"/admin/jobs/{cand.job_id}"
+    return RedirectResponse(url=referer, status_code=303)
+
+
 @router.get("/candidates/{id}/conversations", response_class=HTMLResponse)
 async def candidate_conversations(
     request: Request,
@@ -334,9 +426,26 @@ async def candidate_conversations(
         .order_by(CandidateEvent.created_at.desc())
         .all()
     )
-
-    return templates.TemplateResponse(
-        request=request,
-        name="admin/candidate_conversations.html",
-        context={"candidate": cand, "messages": messages, "events": events, "active_nav": "jobs"},
+    inbound_messages = (
+        db.query(InboundMessage)
+        .filter(InboundMessage.candidate_id == id)
+        .order_by(InboundMessage.received_at.desc())
+        .all()
     )
+
+    is_hx = request.headers.get("HX-Request") == "true" or request.headers.get("hx-request") == "true"
+    template_name = "admin/candidate_conversations_partial.html" if is_hx else "admin/candidate_conversations.html"
+
+    response = templates.TemplateResponse(
+        request=request,
+        name=template_name,
+        context={
+            "candidate": cand,
+            "messages": messages,
+            "events": events,
+            "inbound_messages": inbound_messages,
+            "active_nav": "jobs",
+        },
+    )
+    response.headers["Vary"] = "HX-Request"
+    return response

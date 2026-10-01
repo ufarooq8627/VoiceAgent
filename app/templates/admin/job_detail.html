@@ -138,6 +138,9 @@
                             </td>
                             <td>
                                 <span class="badge badge-{{ c.status.lower() }}">{{ c.status }}</span>
+                                {% if c.has_inbound_after_close %}
+                                <span class="badge badge-warning" style="background: #f59e0b; color: #fff; margin-top: 4px; display: inline-block;" title="Inbound reply arrived after close">ignored after close</span>
+                                {% endif %}
                             </td>
                             <td>
                                 {% if c.status == 'NEW' %}
@@ -145,6 +148,13 @@
                                     <input type="hidden" name="job_id" value="{{ job.id }}">
                                     <button type="submit" class="btn btn-outline btn-sm">Shortlist</button>
                                 </form>
+                                {% elif c.status == 'NEEDS_RECRUITER' %}
+                                <div style="display: flex; gap: 0.25rem;">
+                                    <form method="POST" action="/admin/candidates/{{ c.id }}/reinvite" style="display: inline;">
+                                        <button type="submit" class="btn btn-primary btn-sm">Re-invite</button>
+                                    </form>
+                                    <a href="/admin/candidates/{{ c.id }}/conversations" class="btn btn-outline btn-sm">History</a>
+                                </div>
                                 {% elif c.status == 'BOOKED' %}
                                 <span class="text-sm" style="color: var(--status-booked); font-weight: 500;">✓ Confirmed</span>
                                 {% else %}

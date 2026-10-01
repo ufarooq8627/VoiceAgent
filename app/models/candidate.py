@@ -34,3 +34,7 @@ class Candidate(Base):
     events = relationship("CandidateEvent", back_populates="candidate")
     conversation_messages = relationship("ConversationMessage", back_populates="candidate")
     inbound_messages = relationship("InboundMessage", back_populates="candidate")
+
+    @property
+    def has_inbound_after_close(self) -> bool:
+        return any(e.event_type == "inbound_after_close" for e in self.events)

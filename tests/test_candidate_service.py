@@ -28,7 +28,7 @@ def test_mock_candidates_have_required_fields(db_session, job):
 
 def test_mock_skills_match_backend_job(db_session, job):
     candidates = CandidateService.generate_mock(db_session, job.id, count=10)
-    backend_skills = {"Python", "FastAPI", "Django", "PostgreSQL", "Redis", "Node.js"}
+    backend_skills = {"Python", "FastAPI", "Django", "PostgreSQL", "Redis", "Node.js", "Docker", "Celery", "SQLAlchemy", "RabbitMQ"}
     for c in candidates:
         assert any(s in backend_skills for s in c.skills)
 
