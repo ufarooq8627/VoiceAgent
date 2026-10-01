@@ -4,7 +4,7 @@ from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.models import Slot
+from app.models import Slot, Booking
 from app.services.invitation_service import InvitationService
 from app.services.slot_service import SlotService
 from app.services.state_machine import transition_candidate, CandidateStatus
@@ -21,6 +21,30 @@ async def public_booking_page(request: Request, token: str, db: Session = Depend
 
     candidate = invitation.candidate
     job = candidate.job
+
+    if candidate.status == CandidateStatus.BOOKED:
+        booking = db.query(Booking).filter(Booking.candidate_id == candidate.id, Booking.status == "confirmed").first()
+        slot = booking.slot if booking else None
+        return templates.TemplateResponse(
+            request=request,
+            name="public/booked.html",
+            context={"job": job, "slot": slot, "candidate": candidate},
+        )
+
+    if candidate.status == CandidateStatus.DECLINED:
+        return templates.TemplateResponse(
+            request=request,
+            name="public/declined.html",
+            context={"candidate": candidate},
+        )
+
+    if candidate.status == CandidateStatus.NEEDS_RECRUITER:
+        return templates.TemplateResponse(
+            request=request,
+            name="public/declined.html",
+            context={"candidate": candidate, "message": "Your request has been escalated to our recruiter. We will reach out shortly."},
+        )
+
     available_slots = SlotService.get_available(db, job.id)
 
     return templates.TemplateResponse(

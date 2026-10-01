@@ -1,3 +1,4 @@
+from app.services.inbound_service import InboundService
 import io
 from datetime import datetime, timezone
 from fastapi import APIRouter, Request, Depends, Form, HTTPException
@@ -302,15 +303,12 @@ async def mock_inbox_simulate(
     if not settings.mock_inbox:
         raise HTTPException(status_code=403, detail="Mock inbox is disabled")
 
-    inbound = InboundMessage(
-        candidate_id=candidate_id,
+    inbound = InboundService.ingest(
+        db=db,
         from_address=from_address,
         subject=subject,
         body_text=body_text,
-        processed=False,
     )
-    db.add(inbound)
-    db.commit()
     return RedirectResponse(url="/admin/mock-inbox", status_code=303)
 
 
