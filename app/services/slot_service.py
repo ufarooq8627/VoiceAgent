@@ -1,8 +1,8 @@
-from datetime import datetime, timedelta
-from sqlalchemy import update
+from datetime import datetime, timedelta, timezone
 from sqlalchemy.orm import Session
+from sqlalchemy import update
 
-from app.models import Slot, Booking, Interviewer
+from app.models import Slot, Booking, Interviewer, Candidate
 from app.services.state_machine import transition_candidate, CandidateStatus
 
 
@@ -15,47 +15,26 @@ class SlotService:
         start_at_utc: datetime,
         end_at_utc: datetime,
         duration_minutes: int = 30,
-        mode: str = "video",
+        mode: str = "virtual",
         location_or_link: str | None = None,
     ) -> list[Slot]:
-        if end_at_utc <= start_at_utc:
-            raise ValueError("end_at_utc must be greater than start_at_utc")
-
-        step = timedelta(minutes=duration_minutes)
-        current_start = start_at_utc
         slots = []
+        current = start_at_utc
+        duration = timedelta(minutes=duration_minutes)
 
-        while current_start + step <= end_at_utc:
-            current_end = current_start + step
-
-            # Overlap check for interviewer
-            overlap = (
-                db.query(Slot)
-                .filter(
-                    Slot.interviewer_id == interviewer_id,
-                    Slot.status != "cancelled",
-                    Slot.start_at_utc < current_end,
-                    Slot.end_at_utc > current_start,
-                )
-                .first()
-            )
-            if overlap:
-                raise ValueError(
-                    f"Slot from {current_start} to {current_end} overlaps with an existing slot"
-                )
-
+        while current + duration <= end_at_utc:
             slot = Slot(
                 job_id=job_id,
                 interviewer_id=interviewer_id,
-                start_at_utc=current_start,
-                end_at_utc=current_end,
+                start_at_utc=current,
+                end_at_utc=current + duration,
                 mode=mode,
                 location_or_link=location_or_link,
                 status="open",
             )
             db.add(slot)
             slots.append(slot)
-            current_start = current_end
+            current += duration
 
         db.commit()
         for s in slots:
@@ -64,9 +43,14 @@ class SlotService:
 
     @staticmethod
     def get_available(db: Session, job_id: str) -> list[dict]:
+        now = datetime.now(timezone.utc)
         slots = (
             db.query(Slot)
-            .filter(Slot.job_id == job_id, Slot.status == "open")
+            .filter(
+                Slot.job_id == job_id,
+                Slot.status == "open",
+                Slot.start_at_utc > now,
+            )
             .order_by(Slot.start_at_utc.asc())
             .all()
         )
@@ -80,8 +64,8 @@ class SlotService:
                 "id": slot.id,
                 "slot": slot,
                 "date": slot.start_at_utc.strftime("%Y-%m-%d"),
-                "start_time": slot.start_at_utc.strftime("%H:%M UTC"),
-                "end_time": slot.end_at_utc.strftime("%H:%M UTC"),
+                "start_time": slot.start_at_utc.strftime("%H:M UTC"),
+                "end_time": slot.end_at_utc.strftime("%H:M UTC"),
                 "interviewer_name": interviewer_name,
                 "mode": slot.mode,
                 "location_or_link": slot.location_or_link,
@@ -94,7 +78,26 @@ class SlotService:
         slot_id: str,
         candidate_id: str,
         actor: str = "agent",
+        commit: bool = True,
     ) -> tuple[bool, Booking | str]:
+        candidate = db.query(Candidate).filter(Candidate.id == candidate_id).first()
+        if not candidate:
+            return False, "Candidate not found"
+
+        allowed_statuses = {CandidateStatus.INVITED, CandidateStatus.FOLLOW_UP}
+        if actor == "recruiter":
+            allowed_statuses.add(CandidateStatus.NEEDS_RECRUITER)
+
+        if candidate.status not in allowed_statuses:
+            return False, f"Candidate is in status {candidate.status}, cannot book"
+
+        existing_booking = db.query(Booking).filter(
+            Booking.candidate_id == candidate_id,
+            Booking.status == "confirmed",
+        ).first()
+        if existing_booking:
+            return False, "Candidate already has a confirmed booking"
+
         # Atomic slot state update
         stmt = (
             update(Slot)
@@ -108,6 +111,7 @@ class SlotService:
         booking = Booking(candidate_id=candidate_id, slot_id=slot_id, status="confirmed")
         db.add(booking)
 
+
         try:
             transition_candidate(
                 db,
@@ -115,13 +119,17 @@ class SlotService:
                 CandidateStatus.BOOKED,
                 actor=actor,
                 payload={"slot_id": slot_id},
+                commit=False,
             )
         except Exception as e:
-            db.rollback()
+            if commit:
+                db.rollback()
             return False, f"Failed state transition: {str(e)}"
 
-        db.commit()
-        db.refresh(booking)
+        db.flush()
+        if commit:
+            db.commit()
+            db.refresh(booking)
         return True, booking
 
     @staticmethod

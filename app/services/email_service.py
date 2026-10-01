@@ -19,6 +19,8 @@ class EmailService:
         body_html: str,
         body_text: str,
         send_after: datetime | None = None,
+        offered_slots: dict | None = None,
+        commit: bool = True,
     ) -> EmailOutbox:
         outbox = EmailOutbox(
             candidate_id=candidate_id,
@@ -29,10 +31,13 @@ class EmailService:
             body_text=body_text,
             status="queued",
             send_after=send_after,
+            offered_slots=offered_slots,
         )
         db.add(outbox)
-        db.commit()
-        db.refresh(outbox)
+        db.flush()
+        if commit:
+            db.commit()
+            db.refresh(outbox)
         return outbox
 
     @classmethod
@@ -46,6 +51,8 @@ class EmailService:
         job = db.query(Job).filter(Job.id == job_id).first()
         job_title = job.title if job else "the position"
         available_slots = SlotService.get_available(db, job_id)
+
+        offered_slots = {s["label"]: s["id"] for s in available_slots}
 
         slots_text = "\n".join(
             f"{s['label']}: {s['date']} {s['start_time']} - {s['end_time']} (Interviewer: {s['interviewer_name']}, Mode: {s['mode']})"
@@ -63,7 +70,7 @@ class EmailService:
                 continue
 
             # State transition to INVITED
-            transition_candidate(db, candidate.id, CandidateStatus.INVITED, actor="system")
+            transition_candidate(db, candidate.id, CandidateStatus.INVITED, actor="system", commit=False)
 
             # Create invitation token
             invitation, raw_token = InvitationService.create_invitation(db, candidate.id)
@@ -98,6 +105,8 @@ class EmailService:
                 subject=subject,
                 body_html=body_html,
                 body_text=body_text,
+                offered_slots=offered_slots,
+                commit=False,
             )
 
             # Record in conversation messages

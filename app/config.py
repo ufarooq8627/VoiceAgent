@@ -1,3 +1,4 @@
+from pydantic import model_validator
 from pydantic_settings import BaseSettings
 
 
@@ -10,10 +11,23 @@ class Settings(BaseSettings):
     mock_inbox: bool = True
     agent_tick_interval_seconds: int = 30
     outbox_batch_size: int = 50
-    llm_provider: str = "none"
+    llm_provider: str = "none"          # none | gemini
     llm_api_key: str = ""
-    llm_model: str = ""
-    agent_confidence_threshold: float = 0.5
+    llm_model: str = "gemini-2.5-flash"
+    llm_timeout_seconds: int = 20
+    agent_confidence_threshold: float = 0.7
+    agent_max_clarifications: int = 2
+    agent_max_llm_attempts: int = 3
+    agent_claim_timeout_seconds: int = 300
+    agent_context_messages: int = 10
+    agent_max_outbound_per_day: int = 6
+    webhook_secret: str = ""            # empty => webhook disabled
+
+    @model_validator(mode="after")
+    def validate_llm_config(self):
+        if self.llm_provider == "gemini" and not self.llm_api_key:
+            raise ValueError("LLM_API_KEY must be set when LLM_PROVIDER is 'gemini'")
+        return self
 
     model_config = {"env_file": ".env", "env_file_encoding": "utf-8", "extra": "ignore"}
 
