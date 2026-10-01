@@ -64,8 +64,8 @@ class SlotService:
                 "id": slot.id,
                 "slot": slot,
                 "date": slot.start_at_utc.strftime("%Y-%m-%d"),
-                "start_time": slot.start_at_utc.strftime("%H:M UTC"),
-                "end_time": slot.end_at_utc.strftime("%H:M UTC"),
+                "start_time": slot.start_at_utc.strftime("%H:%M UTC"),
+                "end_time": slot.end_at_utc.strftime("%H:%M UTC"),
                 "interviewer_name": interviewer_name,
                 "mode": slot.mode,
                 "location_or_link": slot.location_or_link,
@@ -79,17 +79,19 @@ class SlotService:
         candidate_id: str,
         actor: str = "agent",
         commit: bool = True,
+        transition: bool = True,
     ) -> tuple[bool, Booking | str]:
         candidate = db.query(Candidate).filter(Candidate.id == candidate_id).first()
         if not candidate:
             return False, "Candidate not found"
 
-        allowed_statuses = {CandidateStatus.INVITED, CandidateStatus.FOLLOW_UP}
-        if actor == "recruiter":
-            allowed_statuses.add(CandidateStatus.NEEDS_RECRUITER)
+        if transition:
+            allowed_statuses = {CandidateStatus.INVITED, CandidateStatus.FOLLOW_UP}
+            if actor == "recruiter":
+                allowed_statuses.add(CandidateStatus.NEEDS_RECRUITER)
 
-        if candidate.status not in allowed_statuses:
-            return False, f"Candidate is in status {candidate.status}, cannot book"
+            if candidate.status not in allowed_statuses:
+                return False, f"Candidate is in status {candidate.status}, cannot book"
 
         existing_booking = db.query(Booking).filter(
             Booking.candidate_id == candidate_id,
@@ -111,20 +113,20 @@ class SlotService:
         booking = Booking(candidate_id=candidate_id, slot_id=slot_id, status="confirmed")
         db.add(booking)
 
-
-        try:
-            transition_candidate(
-                db,
-                candidate_id,
-                CandidateStatus.BOOKED,
-                actor=actor,
-                payload={"slot_id": slot_id},
-                commit=False,
-            )
-        except Exception as e:
-            if commit:
-                db.rollback()
-            return False, f"Failed state transition: {str(e)}"
+        if transition:
+            try:
+                transition_candidate(
+                    db,
+                    candidate_id,
+                    CandidateStatus.BOOKED,
+                    actor=actor,
+                    payload={"slot_id": slot_id},
+                    commit=False,
+                )
+            except Exception as e:
+                if commit:
+                    db.rollback()
+                return False, f"Failed state transition: {str(e)}"
 
         db.flush()
         if commit:

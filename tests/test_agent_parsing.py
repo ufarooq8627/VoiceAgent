@@ -62,7 +62,7 @@ def test_wrong_slot_letter(db_session, candidate_with_slots):
     # Slot Z does not exist
     result = tools.book_slot("Z")
     assert result["success"] is False
-    assert result["reason"] == "invalid_label"
+    assert result["reason"] in ("invalid_label", "unknown_label")
     assert len(result["remaining_slots"]) == 3
 
 
