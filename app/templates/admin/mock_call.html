@@ -22,10 +22,10 @@
         <h3 style="font-size: 1.1rem; font-weight: 600; margin: 0; color: #f8fafc; display: flex; align-items: center; gap: 8px;">
             <span>📞</span> Call Configuration
         </h3>
-        
+
         <div class="form-group" style="margin-bottom: 0;">
             <label style="display: block; font-size: 0.85rem; color: #94a3b8; margin-bottom: 6px; font-weight: 500;">Select Target Business</label>
-            <select id="business-select" class="form-control" style="width: 100%; background: #0f172a; border: 1px solid #334155; color: #f8fafc; padding: 10px 12px; border-radius: 8px;" onchange="onBusinessChange()">
+            <select id="business-select" class="form-control" style="width: 100%; background: #0f172a; border: 1px solid #334155; color: #f8fafc; padding: 10px 12px; border-radius: 8px;">
                 {% for b in businesses %}
                 <option value="{{ b.id }}">{{ b.name }} ({{ b.timezone }})</option>
                 {% else %}
@@ -51,24 +51,24 @@
 
         <!-- Call Action Buttons -->
         <div style="display: flex; gap: 12px; margin-top: auto;">
-            <button id="start-call-btn" class="btn btn-primary" style="flex: 1; padding: 12px; font-weight: 600; display: flex; align-items: center; justify-content: center; gap: 8px; background: #10b981; border: none;" onclick="startCall()">
+            <button id="start-call-btn" class="btn btn-primary" style="flex: 1; padding: 12px; font-weight: 600; display: flex; align-items: center; justify-content: center; gap: 8px; background: #10b981; border: none; cursor: pointer;" onclick="startCall()">
                 <span>🟢</span> Start Inbound Call
             </button>
-            <button id="end-call-btn" class="btn btn-danger" style="flex: 1; padding: 12px; font-weight: 600; display: none; align-items: center; justify-content: center; gap: 8px; background: #ef4444; border: none;" onclick="endCall()">
+            <button id="end-call-btn" class="btn btn-danger" style="flex: 1; padding: 12px; font-weight: 600; display: none; align-items: center; justify-content: center; gap: 8px; background: #ef4444; border: none; cursor: pointer;" onclick="endCall()">
                 <span>🔴</span> Hang Up
             </button>
         </div>
 
         <!-- Audio Pulse Visualizer -->
         <div id="audio-visualizer" style="display: none; background: #0f172a; border-radius: 8px; padding: 12px; border: 1px solid #334155; text-align: center;">
-            <div style="font-size: 0.75rem; color: #94a3b8; margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.05em;">AI Receptionist Voice Channel</div>
+            <div id="voice-channel-label" style="font-size: 0.75rem; color: #38bdf8; margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.05em; font-weight: 600;">AI Receptionist Voice Active</div>
             <div class="voice-bars" style="display: flex; justify-content: center; align-items: flex-end; gap: 4px; height: 32px;">
-                <span class="vbar" style="width: 4px; height: 8px; background: #38bdf8; border-radius: 2px;"></span>
-                <span class="vbar" style="width: 4px; height: 18px; background: #38bdf8; border-radius: 2px;"></span>
-                <span class="vbar" style="width: 4px; height: 26px; background: #38bdf8; border-radius: 2px;"></span>
-                <span class="vbar" style="width: 4px; height: 14px; background: #38bdf8; border-radius: 2px;"></span>
-                <span class="vbar" style="width: 4px; height: 22px; background: #38bdf8; border-radius: 2px;"></span>
-                <span class="vbar" style="width: 4px; height: 10px; background: #38bdf8; border-radius: 2px;"></span>
+                <span class="vbar vbar-anim" style="width: 4px; height: 8px; background: #38bdf8; border-radius: 2px;"></span>
+                <span class="vbar vbar-anim" style="width: 4px; height: 18px; background: #38bdf8; border-radius: 2px;"></span>
+                <span class="vbar vbar-anim" style="width: 4px; height: 26px; background: #38bdf8; border-radius: 2px;"></span>
+                <span class="vbar vbar-anim" style="width: 4px; height: 14px; background: #38bdf8; border-radius: 2px;"></span>
+                <span class="vbar vbar-anim" style="width: 4px; height: 22px; background: #38bdf8; border-radius: 2px;"></span>
+                <span class="vbar vbar-anim" style="width: 4px; height: 10px; background: #38bdf8; border-radius: 2px;"></span>
             </div>
         </div>
     </div>
@@ -85,33 +85,47 @@
         </div>
 
         <!-- Transcript Feed -->
-        <div id="transcript-feed" style="flex: 1; overflow-y: auto; padding: 20px 0; display: flex; flex-direction: column; gap: 16px; max-height: 480px;">
+        <div id="transcript-feed" style="flex: 1; overflow-y: auto; padding: 20px 0; display: flex; flex-direction: column; gap: 16px; max-height: 440px;">
             <div id="empty-state" style="text-align: center; color: #64748b; margin: auto; padding: 40px 20px;">
                 <div style="font-size: 2.5rem; margin-bottom: 12px;">🎙️</div>
                 <div style="font-weight: 500; font-size: 1rem; color: #94a3b8;">Simulator is Idle</div>
-                <div style="font-size: 0.85rem; margin-top: 4px;">Click "Start Inbound Call" on the left to simulate a customer dialing the business.</div>
+                <div style="font-size: 0.85rem; margin-top: 4px;">Click "Start Inbound Call" on the left to begin your conversation.</div>
             </div>
         </div>
 
         <!-- Quick Test Chips -->
         <div id="quick-chips" style="display: none; padding: 10px 0; border-top: 1px solid rgba(255,255,255,0.08); gap: 8px; flex-wrap: wrap;">
             <button class="chip" onclick="sendQuickPrompt('What are your opening hours on weekdays?')">🕒 Opening hours?</button>
-            <button class="chip" onclick="sendQuickPrompt('Do you have appointments available this afternoon?')">📅 Live availability?</button>
+            <button class="chip" onclick="sendQuickPrompt('What is the price of cardiology consultation?')">💳 Consultation price?</button>
             <button class="chip" onclick="sendQuickPrompt('Can I bring my pet iguana into the waiting room?')">🦎 Unanswered question test</button>
             <button class="chip" onclick="sendQuickPrompt('Yes, please have someone call me back at +15559876543')">📞 Callback consent test</button>
         </div>
 
+        <!-- Live Audio Waveform Graph & Voice Indicator -->
+        <div id="waveform-panel" style="display: none; margin-top: 12px; padding: 12px; background: #0f172a; border: 1px solid #334155; border-radius: 8px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                <span id="voice-status-text" style="font-size: 0.8rem; font-weight: 600; color: #94a3b8; display: flex; align-items: center; gap: 6px;">
+                    <span id="voice-pulse-dot" style="display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: #64748b;"></span>
+                    <span id="voice-status-msg">Voice Channel Ready</span>
+                </span>
+                <span id="voice-indicator-mode" style="font-size: 0.72rem; color: #64748b; text-transform: uppercase; font-family: monospace;">Web Audio FFT</span>
+            </div>
+            <canvas id="audio-wave-canvas" width="600" height="48" style="width: 100%; height: 48px; display: block; border-radius: 4px; background: #020617;"></canvas>
+        </div>
+
         <!-- Input Box -->
         <div id="turn-input-container" style="display: none; padding-top: 12px; border-top: 1px solid rgba(255,255,255,0.08);">
-            <form onsubmit="handleSendTurn(event)" style="display: flex; gap: 12px;">
-                <input type="text" id="caller-input" class="form-control" placeholder="Speak or type what the customer says..." style="flex: 1; background: #0f172a; border: 1px solid #334155; color: #f8fafc; padding: 12px 16px; border-radius: 8px;" autocomplete="off" />
-                <button type="button" id="mic-btn" class="btn btn-outline" style="border-radius: 8px; padding: 0 16px;" onclick="toggleVoiceInput()" title="Speech to text">
-                    🎤
+            <form onsubmit="handleSendTurn(event)" style="display: flex; gap: 12px; align-items: center;">
+                <input type="text" id="caller-input" class="form-control" placeholder="Speak into mic or type your enquiry..." style="flex: 1; background: #0f172a; border: 1px solid #334155; color: #f8fafc; padding: 12px 16px; border-radius: 8px;" autocomplete="off" />
+                <button type="button" id="mic-btn" class="btn btn-outline" style="border-radius: 8px; padding: 10px 16px; display: flex; align-items: center; justify-content: center; gap: 6px; font-weight: 600; transition: all 0.2s;" onclick="toggleVoiceInput()" title="Click to speak into microphone">
+                    <span id="mic-icon" style="font-size: 1.2rem;">🎤</span>
+                    <span id="mic-label" style="font-size: 0.85rem;">Mic</span>
                 </button>
-                <button type="submit" id="send-turn-btn" class="btn btn-primary" style="border-radius: 8px; padding: 0 24px; font-weight: 600;">
+                <button type="submit" id="send-turn-btn" class="btn btn-primary" style="border-radius: 8px; padding: 12px 24px; font-weight: 600;">
                     Send Turn
                 </button>
             </form>
+            <div id="mic-notice" style="display: none; font-size: 0.78rem; color: #f59e0b; margin-top: 6px; padding: 4px 8px; border-radius: 4px; background: rgba(245, 158, 11, 0.1);"></div>
         </div>
     </div>
 </div>
@@ -161,6 +175,32 @@
     margin-top: 6px;
     display: inline-block;
 }
+
+@keyframes eqBounce {
+    0%, 100% { height: 6px; }
+    50% { height: 28px; }
+}
+.vbar-anim {
+    animation: eqBounce 0.9s ease-in-out infinite;
+}
+.vbar-anim:nth-child(1) { animation-delay: 0.1s; }
+.vbar-anim:nth-child(2) { animation-delay: 0.3s; }
+.vbar-anim:nth-child(3) { animation-delay: 0.5s; }
+.vbar-anim:nth-child(4) { animation-delay: 0.2s; }
+.vbar-anim:nth-child(5) { animation-delay: 0.4s; }
+.vbar-anim:nth-child(6) { animation-delay: 0.15s; }
+
+@keyframes pulseGlow {
+    0% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7); }
+    70% { box-shadow: 0 0 0 10px rgba(239, 68, 68, 0); }
+    100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
+}
+.mic-recording {
+    background: #ef4444 !important;
+    color: #ffffff !important;
+    border-color: #ef4444 !important;
+    animation: pulseGlow 1.5s infinite;
+}
 </style>
 
 <script>
@@ -169,9 +209,21 @@ let callTimerInterval = null;
 let callSeconds = 0;
 let audioEnabled = true;
 
+// Web Audio & Recording state
+let audioCtx = null;
+let analyser = null;
+let micStream = null;
+let isRecording = false;
+let isAgentSpeaking = false;
+let recognition = null;
+let animFrameId = null;
+
 function toggleAudio() {
     audioEnabled = !audioEnabled;
     document.getElementById("tts-status").innerText = audioEnabled ? "ON" : "OFF";
+    if (!audioEnabled && ('speechSynthesis' in window)) {
+        window.speechSynthesis.cancel();
+    }
 }
 
 function speakText(text) {
@@ -180,13 +232,147 @@ function speakText(text) {
     const utterance = new SpeechSynthesisUtterance(text);
     utterance.rate = 1.0;
     utterance.pitch = 1.0;
+
     utterance.onstart = () => {
+        isAgentSpeaking = true;
         document.getElementById("audio-visualizer").style.display = "block";
+        document.getElementById("waveform-panel").style.display = "block";
+        setVoiceStatus("🔊 AI Receptionist Speaking...", "#38bdf8", true);
+        startVisualizerLoop();
     };
     utterance.onend = () => {
+        isAgentSpeaking = false;
         document.getElementById("audio-visualizer").style.display = "none";
+        setVoiceStatus("Ready for your turn", "#94a3b8", false);
+    };
+    utterance.onerror = () => {
+        isAgentSpeaking = false;
+        document.getElementById("audio-visualizer").style.display = "none";
+        setVoiceStatus("Ready for your turn", "#94a3b8", false);
     };
     window.speechSynthesis.speak(utterance);
+}
+
+function setVoiceStatus(msg, color, pulsing = false) {
+    const statusMsg = document.getElementById("voice-status-msg");
+    const pulseDot = document.getElementById("voice-pulse-dot");
+    if (statusMsg) {
+        statusMsg.innerText = msg;
+        statusMsg.style.color = color;
+    }
+    if (pulseDot) {
+        pulseDot.style.background = color;
+        pulseDot.style.boxShadow = pulsing ? `0 0 8px ${color}` : 'none';
+    }
+}
+
+function showMicNotice(msg, isError = false) {
+    const notice = document.getElementById("mic-notice");
+    if (!notice) return;
+    if (!msg) {
+        notice.style.display = "none";
+        return;
+    }
+    notice.style.display = "block";
+    notice.innerText = msg;
+    notice.style.color = isError ? "#f87171" : "#f59e0b";
+    notice.style.background = isError ? "rgba(239, 68, 68, 0.15)" : "rgba(245, 158, 11, 0.1)";
+}
+
+async function initWebAudio() {
+    try {
+        if (!audioCtx) {
+            audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        }
+        if (audioCtx.state === 'suspended') {
+            await audioCtx.resume();
+        }
+        if (!micStream) {
+            micStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            const source = audioCtx.createMediaStreamSource(micStream);
+            analyser = audioCtx.createAnalyser();
+            analyser.fftSize = 64;
+            source.connect(analyser);
+        }
+        return true;
+    } catch (err) {
+        console.warn("Could not initialize microphone Web Audio stream:", err);
+        return false;
+    }
+}
+
+function startVisualizerLoop() {
+    if (animFrameId) cancelAnimationFrame(animFrameId);
+    const canvas = document.getElementById("audio-wave-canvas");
+    if (!canvas) return;
+    const ctx = canvas.getContext("2d");
+    const width = canvas.width;
+    const height = canvas.height;
+
+    const bufferLength = analyser ? analyser.frequencyBinCount : 32;
+    const dataArray = new Uint8Array(bufferLength);
+
+    function render() {
+        if (!isRecording && !isAgentSpeaking) {
+            // Idle state: subtle calm wave
+            ctx.fillStyle = "#020617";
+            ctx.fillRect(0, 0, width, height);
+
+            ctx.beginPath();
+            ctx.strokeStyle = "rgba(148, 163, 184, 0.25)";
+            ctx.lineWidth = 2;
+            ctx.moveTo(0, height / 2);
+            for (let x = 0; x < width; x += 12) {
+                const y = height / 2 + Math.sin(x * 0.04 + Date.now() * 0.003) * 3;
+                ctx.lineTo(x, y);
+            }
+            ctx.stroke();
+            return;
+        }
+
+        animFrameId = requestAnimationFrame(render);
+
+        if (isRecording && analyser) {
+            analyser.getByteFrequencyData(dataArray);
+        }
+
+        ctx.fillStyle = "#020617";
+        ctx.fillRect(0, 0, width, height);
+
+        const barCount = 32;
+        const barWidth = Math.floor(width / barCount);
+
+        for (let i = 0; i < barCount; i++) {
+            let magnitude = 0;
+            if (isRecording) {
+                const val = (analyser && dataArray[i]) ? dataArray[i] : 20;
+                magnitude = (val / 255) * height;
+                if (magnitude < 4) {
+                    magnitude = 4 + Math.sin(i * 0.5 + Date.now() * 0.008) * 3;
+                }
+            } else if (isAgentSpeaking) {
+                // Synthetic speech rhythm
+                magnitude = 8 + Math.sin(i * 0.4 + Date.now() * 0.012) * 16 + Math.cos(i * 0.2 + Date.now() * 0.009) * 8;
+                magnitude = Math.max(4, Math.min(height - 4, magnitude));
+            }
+
+            const x = i * barWidth;
+            const y = height - magnitude;
+
+            const grad = ctx.createLinearGradient(0, height, 0, y);
+            if (isRecording) {
+                grad.addColorStop(0, '#059669');
+                grad.addColorStop(1, '#34d399');
+            } else {
+                grad.addColorStop(0, '#0284c7');
+                grad.addColorStop(1, '#38bdf8');
+            }
+
+            ctx.fillStyle = grad;
+            ctx.fillRect(x + 2, y, barWidth - 4, magnitude);
+        }
+    }
+    render();
 }
 
 function updateCallTimer() {
@@ -215,25 +401,29 @@ async function startCall() {
         const data = await res.json();
         currentCallId = data.call_id;
         document.getElementById("call-id-display").innerText = "Call ID: " + currentCallId;
-        
+
         // UI updates
         document.getElementById("call-status-badge").innerText = "● In Progress";
         document.getElementById("call-status-badge").style.color = "#10b981";
         document.getElementById("call-status-badge").style.background = "rgba(16, 185, 129, 0.15)";
         document.getElementById("call-status-badge").style.borderColor = "rgba(16, 185, 129, 0.3)";
-        
+
         document.getElementById("start-call-btn").style.display = "none";
         document.getElementById("end-call-btn").style.display = "flex";
         document.getElementById("turn-input-container").style.display = "block";
+        document.getElementById("waveform-panel").style.display = "block";
         document.getElementById("quick-chips").style.display = "flex";
         document.getElementById("empty-state").style.display = "none";
+
+        setVoiceStatus("Call connected. Speak or type to begin.", "#10b981", false);
+        startVisualizerLoop();
 
         // Start timer
         callSeconds = 0;
         clearInterval(callTimerInterval);
         callTimerInterval = setInterval(updateCallTimer, 1000);
 
-        // Add greeting to transcript
+        // Add greeting to transcript & speak
         appendMessage("agent", data.greeting);
         speakText(data.greeting);
     } catch (e) {
@@ -243,11 +433,16 @@ async function startCall() {
 
 async function handleSendTurn(e) {
     if (e) e.preventDefault();
+    if (!currentCallId) {
+        alert("Please start the call first by clicking 'Start Inbound Call'.");
+        return;
+    }
     const input = document.getElementById("caller-input");
     const msg = input.value.trim();
-    if (!msg || !currentCallId) return;
+    if (!msg) return;
 
     input.value = "";
+    showMicNotice("");
     appendMessage("caller", msg);
 
     try {
@@ -270,6 +465,10 @@ async function handleSendTurn(e) {
 }
 
 function sendQuickPrompt(text) {
+    if (!currentCallId) {
+        alert("Please click 'Start Inbound Call' first!");
+        return;
+    }
     document.getElementById("caller-input").value = text;
     handleSendTurn(null);
 }
@@ -278,7 +477,7 @@ function appendMessage(role, content, tools = []) {
     const feed = document.getElementById("transcript-feed");
     const bubble = document.createElement("div");
     bubble.className = `msg-bubble msg-${role}`;
-    
+
     let html = `<div>${content}</div>`;
     if (tools && tools.length > 0) {
         html += `<div style="margin-top: 6px;">` + tools.map(t => `<span class="tool-tag">🔧 ${t}</span>`).join(" ") + `</div>`;
@@ -291,13 +490,16 @@ function appendMessage(role, content, tools = []) {
 async function endCall() {
     if (!currentCallId) return;
     try {
+        stopRecording();
+        if ('speechSynthesis' in window) window.speechSynthesis.cancel();
+
         const res = await fetch(`/api/receptionist/calls/${currentCallId}/end`, {
             method: "POST",
             headers: {"Content-Type": "application/json"},
             body: JSON.stringify({ summary: "Call finished via interactive simulator." })
         });
         const data = await res.json();
-        
+
         clearInterval(callTimerInterval);
         document.getElementById("call-status-badge").innerText = "● Call Ended";
         document.getElementById("call-status-badge").style.color = "#94a3b8";
@@ -306,7 +508,9 @@ async function endCall() {
         document.getElementById("end-call-btn").style.display = "none";
         document.getElementById("turn-input-container").style.display = "none";
         document.getElementById("quick-chips").style.display = "none";
-        
+        document.getElementById("audio-visualizer").style.display = "none";
+        document.getElementById("waveform-panel").style.display = "none";
+
         appendMessage("agent", `📞 Call disconnected. Status: ${data.status}. Summary: ${data.summary}`);
         currentCallId = null;
     } catch (e) {
@@ -314,20 +518,109 @@ async function endCall() {
     }
 }
 
-function toggleVoiceInput() {
-    if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
-        alert("Speech recognition is not supported in this browser. Please use text input.");
+function stopRecording() {
+    isRecording = false;
+    const micBtn = document.getElementById("mic-btn");
+    const micLabel = document.getElementById("mic-label");
+    if (micBtn) {
+        micBtn.classList.remove("mic-recording");
+        micBtn.style.background = "";
+        micBtn.style.color = "";
+    }
+    if (micLabel) micLabel.innerText = "Mic";
+    if (recognition) {
+        try { recognition.stop(); } catch (e) {}
+    }
+    if (!isAgentSpeaking) {
+        setVoiceStatus("Ready for your turn", "#94a3b8", false);
+    }
+}
+
+async function toggleVoiceInput() {
+    if (!currentCallId) {
+        alert("Please start the call first by clicking 'Start Inbound Call'.");
         return;
     }
+
+    if (isRecording) {
+        stopRecording();
+        return;
+    }
+
     const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
-    const recognition = new SpeechRec();
-    recognition.lang = 'en-US';
-    recognition.onresult = (event) => {
-        const transcript = event.results[0][0].transcript;
-        document.getElementById("caller-input").value = transcript;
-        handleSendTurn(null);
-    };
-    recognition.start();
+    if (!SpeechRec) {
+        showMicNotice("Speech recognition is not supported in this browser. Please type or use quick chips.", true);
+        return;
+    }
+
+    showMicNotice("");
+    const micBtn = document.getElementById("mic-btn");
+    const micLabel = document.getElementById("mic-label");
+
+    // Initialize Web Audio graph
+    await initWebAudio();
+
+    try {
+        recognition = new SpeechRec();
+        recognition.lang = 'en-US';
+        recognition.interimResults = true;
+        recognition.maxAlternatives = 1;
+        recognition.continuous = false;
+
+        recognition.onstart = () => {
+            isRecording = true;
+            if (micBtn) micBtn.classList.add("mic-recording");
+            if (micLabel) micLabel.innerText = "Listening...";
+            document.getElementById("waveform-panel").style.display = "block";
+            setVoiceStatus("🔴 Listening... Speak clearly now", "#ef4444", true);
+            startVisualizerLoop();
+        };
+
+        recognition.onresult = (event) => {
+            let interimText = '';
+            let finalText = '';
+            for (let i = event.resultIndex; i < event.results.length; ++i) {
+                if (event.results[i].isFinal) {
+                    finalText += event.results[i][0].transcript;
+                } else {
+                    interimText += event.results[i][0].transcript;
+                }
+            }
+            const currentTranscript = finalText || interimText;
+            if (currentTranscript) {
+                document.getElementById("caller-input").value = currentTranscript;
+            }
+            if (finalText) {
+                stopRecording();
+                handleSendTurn(null);
+            }
+        };
+
+        recognition.onerror = (event) => {
+            console.error("Speech recognition error:", event.error);
+            stopRecording();
+            let msg = `Microphone error (${event.error}).`;
+            if (event.error === 'no-speech') {
+                msg = "No speech detected. Click the mic again or type your message.";
+            } else if (event.error === 'not-allowed') {
+                msg = "Microphone access was blocked. Please click the camera/mic icon in your browser address bar to allow access.";
+            } else if (event.error === 'network') {
+                msg = "Speech recognition network error. You can type directly in the box below.";
+            }
+            showMicNotice(msg, true);
+            setVoiceStatus("Ready (type or click mic to retry)", "#94a3b8", false);
+        };
+
+        recognition.onend = () => {
+            stopRecording();
+        };
+
+        recognition.start();
+    } catch (err) {
+        console.error("Could not start speech recognition:", err);
+        stopRecording();
+        showMicNotice("Could not access microphone: " + err.message, true);
+    }
 }
 </script>
 {% endblock %}
