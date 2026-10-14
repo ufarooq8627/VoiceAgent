@@ -16,6 +16,8 @@ class ReceptionistTools:
         return {
             "found": len(results) > 0,
             "count": len(results),
+            "answer": results[0]["answer"] if results else None,
+            "question": results[0]["question"] if results else None,
             "results": [
                 {
                     "id": r["id"],
@@ -27,12 +29,13 @@ class ReceptionistTools:
             ]
         }
 
-    def check_live_data(self, item_name: str, requested_date: str | None = None) -> dict:
+    def check_live_data(self, item_name: str, requested_date: str | None = None, force_stale: bool = False) -> dict:
         return LiveDataAdapter.get_price_or_availability(
             self.db,
             self.business_id,
             item_key=item_name,
-            requested_date=requested_date
+            requested_date=requested_date,
+            force_stale=force_stale
         )
 
     def record_unanswered_question(self, question: str, reason: str) -> dict:

@@ -11,7 +11,11 @@ class KnowledgeService:
     @classmethod
     def search_static(cls, db: Session, business_id: str, query: str) -> list[dict]:
         now = datetime.now(timezone.utc)
-        query_terms = [t.strip().lower() for t in query.split() if len(t.strip()) > 1]
+        STOPWORDS = {"and", "the", "is", "in", "at", "to", "of", "for", "a", "an", "on", "with", "do", "you", "are", "what", "where", "how", "your", "our"}
+        raw_terms = [t.strip().lower() for t in query.split() if len(t.strip()) > 1]
+        query_terms = [t for t in raw_terms if t not in STOPWORDS]
+        if not query_terms:
+            query_terms = raw_terms
 
         items = (
             db.query(KnowledgeItem)

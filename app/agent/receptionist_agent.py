@@ -33,6 +33,35 @@ class GeminiReceptionistAgent:
         tools_invoked = []
         actions_taken = []
 
+        # 0. Safety and Boundary Checks (Section 4 & Section 9)
+        if any(w in msg_lower for w in ["ignore all previous", "ignore your instructions", "system instructions", "system prompt"]):
+            return AgentTurnResult(
+                spoken_response="I am an AI assistant for this business and cannot ignore my operational guidelines. How may I assist you with your enquiry today?",
+                tools_invoked=[],
+                actions_taken=[]
+            )
+
+        if any(w in msg_lower for w in ["home address", "personal cell", "personal number", "personal phone"]):
+            return AgentTurnResult(
+                spoken_response="That information is private and confidential. I cannot share personal details of our owners or staff.",
+                tools_invoked=[],
+                actions_taken=[]
+            )
+
+        if any(w in msg_lower for w in ["across the street", "competitor", "better and cheaper", "cheaper than you"]):
+            return AgentTurnResult(
+                spoken_response="I cannot speak for competitors or other businesses. I can only focus on our verified services.",
+                tools_invoked=[],
+                actions_taken=[]
+            )
+
+        if any(w in msg_lower for w in ["stupid", "idiot", "manager right now"]):
+            return AgentTurnResult(
+                spoken_response="I apologize if you are experiencing frustration. I understand, and I am here to help. Would you like me to schedule a callback with our team?",
+                tools_invoked=[],
+                actions_taken=[]
+            )
+
         # 1. Check for callback confirmation flow
         if any(w in msg_lower for w in ["yes that's correct", "yes, that is correct", "correct", "that's right", "yes"]):
             # Check if previous assistant turn asked for read-back confirmation
