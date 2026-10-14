@@ -79,6 +79,7 @@ class Call(Base):
     caller_number: Mapped[str | None] = mapped_column(String(50), nullable=True)
     outcome: Mapped[str] = mapped_column(String(50), default="in_progress", nullable=False)
     summary: Mapped[str | None] = mapped_column(Text, nullable=True)
+    transcript: Mapped[list | None] = mapped_column(JSON, default=list, nullable=True)
 
     business = relationship("Business", back_populates="calls")
     unanswered_enquiries = relationship("UnansweredEnquiry", back_populates="call", cascade="all, delete-orphan")

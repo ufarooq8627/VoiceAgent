@@ -1,0 +1,333 @@
+{% extends "base.html" %}
+
+{% block title %}Voice Receptionist Simulator | Antigravity AI{% endblock %}
+{% block page_title %}Voice Receptionist Simulator{% endblock %}
+
+{% block topbar_actions %}
+<div class="simulator-status-bar" style="display: flex; align-items: center; gap: 12px;">
+    <span id="call-status-badge" class="badge" style="background: rgba(148, 163, 184, 0.15); color: #94a3b8; font-weight: 600; padding: 6px 14px; border-radius: 9999px; border: 1px solid rgba(148, 163, 184, 0.2);">
+        ● Idle
+    </span>
+    <span id="call-timer" style="font-family: monospace; font-size: 0.95rem; color: #94a3b8;">00:00</span>
+    <button id="tts-toggle-btn" class="btn btn-outline btn-sm" onclick="toggleAudio()" style="border-radius: 9999px;">
+        🔊 Voice Audio: <strong id="tts-status">ON</strong>
+    </button>
+</div>
+{% endblock %}
+
+{% block content %}
+<div style="display: grid; grid-template-columns: 360px 1fr; gap: 24px; min-height: calc(100vh - 160px);">
+    <!-- Left Column: Setup & Phone Controls -->
+    <div style="background: #1e293b; border-radius: 12px; padding: 24px; border: 1px solid rgba(255,255,255,0.08); display: flex; flex-direction: column; gap: 20px;">
+        <h3 style="font-size: 1.1rem; font-weight: 600; margin: 0; color: #f8fafc; display: flex; align-items: center; gap: 8px;">
+            <span>📞</span> Call Configuration
+        </h3>
+        
+        <div class="form-group" style="margin-bottom: 0;">
+            <label style="display: block; font-size: 0.85rem; color: #94a3b8; margin-bottom: 6px; font-weight: 500;">Select Target Business</label>
+            <select id="business-select" class="form-control" style="width: 100%; background: #0f172a; border: 1px solid #334155; color: #f8fafc; padding: 10px 12px; border-radius: 8px;" onchange="onBusinessChange()">
+                {% for b in businesses %}
+                <option value="{{ b.id }}">{{ b.name }} ({{ b.timezone }})</option>
+                {% else %}
+                <option value="biz-demo">Demo Apex Dental Clinic</option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <div class="form-group" style="margin-bottom: 0;">
+            <label style="display: block; font-size: 0.85rem; color: #94a3b8; margin-bottom: 6px; font-weight: 500;">Dialed Inbound Phone Number</label>
+            <input type="text" id="dialed-number" class="form-control" style="width: 100%; background: #0f172a; border: 1px solid #334155; color: #f8fafc; padding: 10px 12px; border-radius: 8px;" value="{% if phone_numbers %}{{ phone_numbers[0].phone_number }}{% else %}+15550001111{% endif %}" placeholder="+15550001111" />
+        </div>
+
+        <div class="form-group" style="margin-bottom: 0;">
+            <label style="display: block; font-size: 0.85rem; color: #94a3b8; margin-bottom: 6px; font-weight: 500;">Caller Phone Number</label>
+            <input type="text" id="caller-number" class="form-control" style="width: 100%; background: #0f172a; border: 1px solid #334155; color: #f8fafc; padding: 10px 12px; border-radius: 8px;" value="+15559876543" placeholder="+15559876543" />
+        </div>
+
+        <div class="form-group" style="margin-bottom: 0;">
+            <label style="display: block; font-size: 0.85rem; color: #94a3b8; margin-bottom: 6px; font-weight: 500;">Caller Name (Optional)</label>
+            <input type="text" id="caller-name" class="form-control" style="width: 100%; background: #0f172a; border: 1px solid #334155; color: #f8fafc; padding: 10px 12px; border-radius: 8px;" value="Sarah Jenkins" placeholder="e.g. Sarah Jenkins" />
+        </div>
+
+        <!-- Call Action Buttons -->
+        <div style="display: flex; gap: 12px; margin-top: auto;">
+            <button id="start-call-btn" class="btn btn-primary" style="flex: 1; padding: 12px; font-weight: 600; display: flex; align-items: center; justify-content: center; gap: 8px; background: #10b981; border: none;" onclick="startCall()">
+                <span>🟢</span> Start Inbound Call
+            </button>
+            <button id="end-call-btn" class="btn btn-danger" style="flex: 1; padding: 12px; font-weight: 600; display: none; align-items: center; justify-content: center; gap: 8px; background: #ef4444; border: none;" onclick="endCall()">
+                <span>🔴</span> Hang Up
+            </button>
+        </div>
+
+        <!-- Audio Pulse Visualizer -->
+        <div id="audio-visualizer" style="display: none; background: #0f172a; border-radius: 8px; padding: 12px; border: 1px solid #334155; text-align: center;">
+            <div style="font-size: 0.75rem; color: #94a3b8; margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.05em;">AI Receptionist Voice Channel</div>
+            <div class="voice-bars" style="display: flex; justify-content: center; align-items: flex-end; gap: 4px; height: 32px;">
+                <span class="vbar" style="width: 4px; height: 8px; background: #38bdf8; border-radius: 2px;"></span>
+                <span class="vbar" style="width: 4px; height: 18px; background: #38bdf8; border-radius: 2px;"></span>
+                <span class="vbar" style="width: 4px; height: 26px; background: #38bdf8; border-radius: 2px;"></span>
+                <span class="vbar" style="width: 4px; height: 14px; background: #38bdf8; border-radius: 2px;"></span>
+                <span class="vbar" style="width: 4px; height: 22px; background: #38bdf8; border-radius: 2px;"></span>
+                <span class="vbar" style="width: 4px; height: 10px; background: #38bdf8; border-radius: 2px;"></span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Right Column: Live Conversation & Tools Stream -->
+    <div style="background: #1e293b; border-radius: 12px; padding: 24px; border: 1px solid rgba(255,255,255,0.08); display: flex; flex-direction: column;">
+        <!-- Header -->
+        <div style="display: flex; justify-content: space-between; align-items: center; padding-bottom: 16px; border-bottom: 1px solid rgba(255,255,255,0.08);">
+            <div>
+                <h3 style="margin: 0; font-size: 1.1rem; font-weight: 600; color: #f8fafc;">Live Call Audio Transcript</h3>
+                <span id="call-id-display" style="font-size: 0.8rem; color: #64748b; font-family: monospace;">No call in progress</span>
+            </div>
+            <div id="tool-pills" style="display: flex; gap: 6px; flex-wrap: wrap;"></div>
+        </div>
+
+        <!-- Transcript Feed -->
+        <div id="transcript-feed" style="flex: 1; overflow-y: auto; padding: 20px 0; display: flex; flex-direction: column; gap: 16px; max-height: 480px;">
+            <div id="empty-state" style="text-align: center; color: #64748b; margin: auto; padding: 40px 20px;">
+                <div style="font-size: 2.5rem; margin-bottom: 12px;">🎙️</div>
+                <div style="font-weight: 500; font-size: 1rem; color: #94a3b8;">Simulator is Idle</div>
+                <div style="font-size: 0.85rem; margin-top: 4px;">Click "Start Inbound Call" on the left to simulate a customer dialing the business.</div>
+            </div>
+        </div>
+
+        <!-- Quick Test Chips -->
+        <div id="quick-chips" style="display: none; padding: 10px 0; border-top: 1px solid rgba(255,255,255,0.08); gap: 8px; flex-wrap: wrap;">
+            <button class="chip" onclick="sendQuickPrompt('What are your opening hours on weekdays?')">🕒 Opening hours?</button>
+            <button class="chip" onclick="sendQuickPrompt('Do you have appointments available this afternoon?')">📅 Live availability?</button>
+            <button class="chip" onclick="sendQuickPrompt('Can I bring my pet iguana into the waiting room?')">🦎 Unanswered question test</button>
+            <button class="chip" onclick="sendQuickPrompt('Yes, please have someone call me back at +15559876543')">📞 Callback consent test</button>
+        </div>
+
+        <!-- Input Box -->
+        <div id="turn-input-container" style="display: none; padding-top: 12px; border-top: 1px solid rgba(255,255,255,0.08);">
+            <form onsubmit="handleSendTurn(event)" style="display: flex; gap: 12px;">
+                <input type="text" id="caller-input" class="form-control" placeholder="Speak or type what the customer says..." style="flex: 1; background: #0f172a; border: 1px solid #334155; color: #f8fafc; padding: 12px 16px; border-radius: 8px;" autocomplete="off" />
+                <button type="button" id="mic-btn" class="btn btn-outline" style="border-radius: 8px; padding: 0 16px;" onclick="toggleVoiceInput()" title="Speech to text">
+                    🎤
+                </button>
+                <button type="submit" id="send-turn-btn" class="btn btn-primary" style="border-radius: 8px; padding: 0 24px; font-weight: 600;">
+                    Send Turn
+                </button>
+            </form>
+        </div>
+    </div>
+</div>
+
+<style>
+.chip {
+    background: #0f172a;
+    border: 1px solid #334155;
+    color: #94a3b8;
+    padding: 6px 12px;
+    border-radius: 9999px;
+    font-size: 0.8rem;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+.chip:hover {
+    background: #1e293b;
+    color: #38bdf8;
+    border-color: #38bdf8;
+}
+.msg-bubble {
+    max-width: 80%;
+    padding: 12px 16px;
+    border-radius: 12px;
+    font-size: 0.92rem;
+    line-height: 1.5;
+}
+.msg-caller {
+    align-self: flex-end;
+    background: #2563eb;
+    color: #ffffff;
+    border-bottom-right-radius: 2px;
+}
+.msg-agent {
+    align-self: flex-start;
+    background: #334155;
+    color: #f1f5f9;
+    border-bottom-left-radius: 2px;
+}
+.tool-tag {
+    font-size: 0.72rem;
+    padding: 2px 8px;
+    border-radius: 4px;
+    background: rgba(56, 189, 248, 0.15);
+    color: #38bdf8;
+    border: 1px solid rgba(56, 189, 248, 0.3);
+    margin-top: 6px;
+    display: inline-block;
+}
+</style>
+
+<script>
+let currentCallId = null;
+let callTimerInterval = null;
+let callSeconds = 0;
+let audioEnabled = true;
+
+function toggleAudio() {
+    audioEnabled = !audioEnabled;
+    document.getElementById("tts-status").innerText = audioEnabled ? "ON" : "OFF";
+}
+
+function speakText(text) {
+    if (!audioEnabled || !('speechSynthesis' in window)) return;
+    window.speechSynthesis.cancel();
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.rate = 1.0;
+    utterance.pitch = 1.0;
+    utterance.onstart = () => {
+        document.getElementById("audio-visualizer").style.display = "block";
+    };
+    utterance.onend = () => {
+        document.getElementById("audio-visualizer").style.display = "none";
+    };
+    window.speechSynthesis.speak(utterance);
+}
+
+function updateCallTimer() {
+    callSeconds++;
+    const mins = String(Math.floor(callSeconds / 60)).padStart(2, '0');
+    const secs = String(callSeconds % 60).padStart(2, '0');
+    document.getElementById("call-timer").innerText = `${mins}:${secs}`;
+}
+
+async function startCall() {
+    const dialed_number = document.getElementById("dialed-number").value.trim();
+    const caller_number = document.getElementById("caller-number").value.trim();
+    const caller_name = document.getElementById("caller-name").value.trim();
+
+    try {
+        const res = await fetch("/api/receptionist/calls/start", {
+            method: "POST",
+            headers: {"Content-Type": "application/json"},
+            body: JSON.stringify({ dialed_number, caller_number, caller_name })
+        });
+        if (!res.ok) {
+            const err = await res.json();
+            alert("Call Failed: " + (err.detail || "Unknown error"));
+            return;
+        }
+        const data = await res.json();
+        currentCallId = data.call_id;
+        document.getElementById("call-id-display").innerText = "Call ID: " + currentCallId;
+        
+        // UI updates
+        document.getElementById("call-status-badge").innerText = "● In Progress";
+        document.getElementById("call-status-badge").style.color = "#10b981";
+        document.getElementById("call-status-badge").style.background = "rgba(16, 185, 129, 0.15)";
+        document.getElementById("call-status-badge").style.borderColor = "rgba(16, 185, 129, 0.3)";
+        
+        document.getElementById("start-call-btn").style.display = "none";
+        document.getElementById("end-call-btn").style.display = "flex";
+        document.getElementById("turn-input-container").style.display = "block";
+        document.getElementById("quick-chips").style.display = "flex";
+        document.getElementById("empty-state").style.display = "none";
+
+        // Start timer
+        callSeconds = 0;
+        clearInterval(callTimerInterval);
+        callTimerInterval = setInterval(updateCallTimer, 1000);
+
+        // Add greeting to transcript
+        appendMessage("agent", data.greeting);
+        speakText(data.greeting);
+    } catch (e) {
+        alert("Error starting call: " + e.message);
+    }
+}
+
+async function handleSendTurn(e) {
+    if (e) e.preventDefault();
+    const input = document.getElementById("caller-input");
+    const msg = input.value.trim();
+    if (!msg || !currentCallId) return;
+
+    input.value = "";
+    appendMessage("caller", msg);
+
+    try {
+        const res = await fetch(`/api/receptionist/calls/${currentCallId}/turn`, {
+            method: "POST",
+            headers: {"Content-Type": "application/json"},
+            body: JSON.stringify({ caller_message: msg })
+        });
+        if (!res.ok) {
+            const err = await res.json();
+            appendMessage("agent", "⚠️ Turn Error: " + (err.detail || "Failed to process turn"));
+            return;
+        }
+        const data = await res.json();
+        appendMessage("agent", data.reply_text, data.tools_called);
+        speakText(data.reply_text);
+    } catch (err) {
+        appendMessage("agent", "⚠️ Communication error: " + err.message);
+    }
+}
+
+function sendQuickPrompt(text) {
+    document.getElementById("caller-input").value = text;
+    handleSendTurn(null);
+}
+
+function appendMessage(role, content, tools = []) {
+    const feed = document.getElementById("transcript-feed");
+    const bubble = document.createElement("div");
+    bubble.className = `msg-bubble msg-${role}`;
+    
+    let html = `<div>${content}</div>`;
+    if (tools && tools.length > 0) {
+        html += `<div style="margin-top: 6px;">` + tools.map(t => `<span class="tool-tag">🔧 ${t}</span>`).join(" ") + `</div>`;
+    }
+    bubble.innerHTML = html;
+    feed.appendChild(bubble);
+    feed.scrollTop = feed.scrollHeight;
+}
+
+async function endCall() {
+    if (!currentCallId) return;
+    try {
+        const res = await fetch(`/api/receptionist/calls/${currentCallId}/end`, {
+            method: "POST",
+            headers: {"Content-Type": "application/json"},
+            body: JSON.stringify({ summary: "Call finished via interactive simulator." })
+        });
+        const data = await res.json();
+        
+        clearInterval(callTimerInterval);
+        document.getElementById("call-status-badge").innerText = "● Call Ended";
+        document.getElementById("call-status-badge").style.color = "#94a3b8";
+        document.getElementById("call-status-badge").style.background = "rgba(148, 163, 184, 0.15)";
+        document.getElementById("start-call-btn").style.display = "flex";
+        document.getElementById("end-call-btn").style.display = "none";
+        document.getElementById("turn-input-container").style.display = "none";
+        document.getElementById("quick-chips").style.display = "none";
+        
+        appendMessage("agent", `📞 Call disconnected. Status: ${data.status}. Summary: ${data.summary}`);
+        currentCallId = null;
+    } catch (e) {
+        alert("Error ending call: " + e.message);
+    }
+}
+
+function toggleVoiceInput() {
+    if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
+        alert("Speech recognition is not supported in this browser. Please use text input.");
+        return;
+    }
+    const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
+    const recognition = new SpeechRec();
+    recognition.lang = 'en-US';
+    recognition.onresult = (event) => {
+        const transcript = event.results[0][0].transcript;
+        document.getElementById("caller-input").value = transcript;
+        handleSendTurn(null);
+    };
+    recognition.start();
+}
+</script>
+{% endblock %}
