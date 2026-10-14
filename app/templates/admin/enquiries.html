@@ -1,0 +1,141 @@
+{% extends "base.html" %}
+
+{% block title %}Enquiries & KB Review | Antigravity AI{% endblock %}
+{% block page_title %}Unanswered Customer Enquiries{% endblock %}
+
+{% block topbar_actions %}
+<div style="display: flex; gap: 12px; align-items: center;">
+    <a href="/admin/receptionist/export" class="btn btn-outline btn-sm" style="display: flex; align-items: center; gap: 6px; border-radius: 8px;">
+        <span>📊</span> Export to Excel (.xlsx)
+    </a>
+</div>
+{% endblock %}
+
+{% block content %}
+<div style="background: #1e293b; border-radius: 12px; border: 1px solid rgba(255,255,255,0.08); padding: 24px;">
+    <!-- Stats Cards -->
+    <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-bottom: 24px;">
+        <div style="background: #0f172a; padding: 16px 20px; border-radius: 8px; border: 1px solid #334155;">
+            <div style="color: #94a3b8; font-size: 0.85rem; font-weight: 500;">Total Enquiries Logged</div>
+            <div style="color: #f8fafc; font-size: 1.8rem; font-weight: 700; margin-top: 4px;">{{ enquiries | length }}</div>
+        </div>
+        <div style="background: #0f172a; padding: 16px 20px; border-radius: 8px; border: 1px solid #334155;">
+            <div style="color: #f59e0b; font-size: 0.85rem; font-weight: 500;">Pending Owner Review</div>
+            <div style="color: #f8fafc; font-size: 1.8rem; font-weight: 700; margin-top: 4px;">
+                {{ pending_count }}
+            </div>
+        </div>
+        <div style="background: #0f172a; padding: 16px 20px; border-radius: 8px; border: 1px solid #334155;">
+            <div style="color: #10b981; font-size: 0.85rem; font-weight: 500;">Resolved & Trained</div>
+            <div style="color: #f8fafc; font-size: 1.8rem; font-weight: 700; margin-top: 4px;">
+                {{ resolved_count }}
+            </div>
+        </div>
+    </div>
+
+    <!-- Enquiries Table -->
+    <div style="overflow-x: auto;">
+        <table class="table" style="width: 100%; border-collapse: collapse; text-align: left; font-size: 0.9rem;">
+            <thead>
+                <tr style="border-bottom: 1px solid #334155; color: #94a3b8;">
+                    <th style="padding: 12px 16px;">Status</th>
+                    <th style="padding: 12px 16px;">Caller & Business</th>
+                    <th style="padding: 12px 16px;">Customer Question</th>
+                    <th style="padding: 12px 16px;">Owner Resolution / Answer</th>
+                    <th style="padding: 12px 16px;">Logged At</th>
+                    <th style="padding: 12px 16px; text-align: right;">Action</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for enq in enquiries %}
+                <tr style="border-bottom: 1px solid rgba(255,255,255,0.05);">
+                    <td style="padding: 16px;">
+                        {% if enq.status == 'resolved' %}
+                        <span class="badge" style="background: rgba(16, 185, 129, 0.15); color: #10b981; border: 1px solid rgba(16, 185, 129, 0.3); padding: 4px 10px; border-radius: 9999px; font-weight: 600;">Resolved</span>
+                        {% else %}
+                        <span class="badge" style="background: rgba(245, 158, 11, 0.15); color: #f59e0b; border: 1px solid rgba(245, 158, 11, 0.3); padding: 4px 10px; border-radius: 9999px; font-weight: 600;">Pending</span>
+                        {% endif %}
+                    </td>
+                    <td style="padding: 16px;">
+                        <div style="font-weight: 600; color: #f8fafc;">
+                            {{ enq.call.caller_number if enq.call and enq.call.caller_number else 'Unknown Caller' }}
+                        </div>
+                        <div style="font-size: 0.8rem; color: #64748b;">
+                            {{ enq.business.name if enq.business else enq.business_id }}
+                        </div>
+                    </td>
+                    <td style="padding: 16px; max-width: 320px;">
+                        <div style="color: #e2e8f0; font-weight: 500;">"{{ enq.question }}"</div>
+                        {% if enq.intent %}
+                        <span style="font-size: 0.75rem; color: #38bdf8;">Tag: {{ enq.intent }}</span>
+                        {% endif %}
+                    </td>
+                    <td style="padding: 16px; max-width: 300px;">
+                        {% if enq.owner_answer %}
+                        <div style="color: #94a3b8; font-style: italic;">{{ enq.owner_answer }}</div>
+                        {% else %}
+                        <span style="color: #64748b;">No answer yet</span>
+                        {% endif %}
+                    </td>
+                    <td style="padding: 16px; color: #64748b; font-size: 0.8rem; white-space: nowrap;">
+                        {{ enq.created_at.strftime('%b %d, %Y %H:%M') if enq.created_at else '' }}
+                    </td>
+                    <td style="padding: 16px; text-align: right;">
+                        <button class="btn btn-outline btn-sm" style="border-radius: 6px;" onclick="openResolveModal('{{ enq.id }}', '{{ enq.question | escape }}', '{{ (enq.owner_answer or '') | escape }}')">
+                            {% if enq.status == 'resolved' %}Edit Answer{% else %}Resolve & Train AI{% endif %}
+                        </button>
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="6" style="padding: 40px; text-align: center; color: #64748b;">
+                        <div style="font-size: 2rem; margin-bottom: 8px;">🎉</div>
+                        <div>No unanswered enquiries found! All customer questions have been answered.</div>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Inline Resolve Modal -->
+<div id="resolve-modal" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.7); backdrop-filter: blur(4px); z-index: 1000; align-items: center; justify-content: center;">
+    <div style="background: #1e293b; border-radius: 12px; border: 1px solid rgba(255,255,255,0.1); width: 100%; max-width: 500px; padding: 24px; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.5);">
+        <h3 style="margin-top: 0; font-size: 1.1rem; color: #f8fafc;">Resolve Customer Enquiry</h3>
+        <p id="modal-question" style="color: #38bdf8; font-weight: 500; margin: 8px 0 16px; font-size: 0.95rem;"></p>
+        
+        <form id="resolve-form" method="POST" action="">
+            <div class="form-group" style="margin-bottom: 16px;">
+                <label style="display: block; font-size: 0.85rem; color: #94a3b8; margin-bottom: 6px;">Business Owner Verified Answer</label>
+                <textarea id="modal-answer" name="owner_answer" class="form-control" rows="4" style="width: 100%; background: #0f172a; border: 1px solid #334155; color: #f8fafc; padding: 10px 12px; border-radius: 8px; resize: vertical;" placeholder="Type the official approved business answer..." required></textarea>
+            </div>
+            
+            <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 20px;">
+                <input type="checkbox" id="modal-publish" name="publish_to_kb" value="true" checked style="width: 16px; height: 16px; accent-color: #2563eb;" />
+                <label for="modal-publish" style="font-size: 0.85rem; color: #e2e8f0; margin: 0; cursor: pointer;">
+                    <strong>Publish immediately to Knowledge Base</strong> (Trains the voice AI for all future calls)
+                </label>
+            </div>
+
+            <div style="display: flex; justify-content: flex-end; gap: 12px;">
+                <button type="button" class="btn btn-outline" style="border-radius: 8px;" onclick="closeResolveModal()">Cancel</button>
+                <button type="submit" class="btn btn-primary" style="border-radius: 8px; background: #2563eb; border: none; font-weight: 600;">Save & Publish</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+function openResolveModal(id, question, existingAnswer) {
+    document.getElementById("resolve-form").action = `/admin/receptionist/enquiries/${id}/resolve`;
+    document.getElementById("modal-question").innerText = `"${question}"`;
+    document.getElementById("modal-answer").value = existingAnswer || "";
+    document.getElementById("resolve-modal").style.display = "flex";
+}
+
+function closeResolveModal() {
+    document.getElementById("resolve-modal").style.display = "none";
+}
+</script>
+{% endblock %}

@@ -7,7 +7,7 @@ from slowapi.errors import RateLimitExceeded
 
 from app.config import settings
 from app.database import Base, engine
-from app.routes import auth, admin, public, api, receptionist_api
+from app.routes import auth, admin, public, api, receptionist_api, receptionist_admin
 from app.agent.worker import start_scheduler, stop_scheduler
 from app.limiter import limiter
 
@@ -38,6 +38,7 @@ app.include_router(admin.router)
 app.include_router(public.router)
 app.include_router(api.router)
 app.include_router(receptionist_api.router)
+app.include_router(receptionist_admin.router)
 
 
 @app.get("/health")
