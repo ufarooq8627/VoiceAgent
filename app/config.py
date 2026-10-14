@@ -13,7 +13,7 @@ class Settings(BaseSettings):
     outbox_batch_size: int = 50
     llm_provider: str = "none"          # none | gemini
     llm_api_key: str = ""
-    llm_model: str = "gemini-2.5-flash"
+    llm_model: str = "gemini-3.5-flash-lite"
     llm_timeout_seconds: int = 20
     agent_confidence_threshold: float = 0.7
     agent_max_clarifications: int = 2

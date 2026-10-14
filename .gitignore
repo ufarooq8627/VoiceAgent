@@ -23,6 +23,8 @@ htmlcov/
 
 # Environment variables
 .env
+keys.txt
+
 
 # Static generated / IDE
 .vscode/
