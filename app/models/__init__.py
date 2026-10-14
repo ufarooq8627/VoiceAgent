@@ -21,3 +21,8 @@ __all__ = [
     "ConversationMessage",
     "CandidateEvent",
 ]
+
+from app.models.receptionist import (
+    Business, BusinessPhoneNumber, KnowledgeItem, LiveDataSource,
+    Call, UnansweredEnquiry, CallbackRequest, OwnerNotification
+)
