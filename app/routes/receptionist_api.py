@@ -145,9 +145,10 @@ async def process_audio_turn(
         return {
             "call_id": call.id,
             "transcription": "",
-            "reply_text": "I could not hear what you said. Could you please repeat that?",
+            "reply_text": "I could not hear anything on the line. It seems your microphone is silent or muted. Please check your mic and speak clearly.",
             "tools_called": [],
             "actions_taken": [],
+            "silence_detected": True,
         }
 
     # Now process the transcribed text through the normal agent pipeline
@@ -189,25 +190,51 @@ async def process_audio_turn(
 
 
 async def _transcribe_audio_with_gemini(audio_bytes: bytes, mime_type: str) -> str:
-    """Use Gemini multimodal API to transcribe audio bytes to text."""
+    """Use Gemini multimodal API to transcribe audio bytes to text with anti-hallucination guard."""
     try:
         from google import genai
+        from google.genai import types
 
         client = genai.Client(api_key=settings.llm_api_key)
+        model_name = settings.llm_model or "gemini-3.5-flash-lite"
+        print(f"[Gemini STT] Sending {len(audio_bytes)} bytes ({mime_type}) to {model_name}...")
 
         response = client.models.generate_content(
-            model=settings.llm_model or "gemini-2.5-flash",
+            model=model_name,
             contents=[
                 {
                     "role": "user",
                     "parts": [
-                        {"text": "Transcribe the following audio recording exactly as spoken. Return ONLY the raw transcription text, nothing else. No quotes, no labels, no formatting. If the audio is silent or unintelligible, return an empty string."},
-                        {"inline_data": {"mime_type": mime_type, "data": __import__("base64").b64encode(audio_bytes).decode("utf-8")}},
+                        {
+                            "text": (
+                                "Listen carefully to this audio recording.\n"
+                                "If there is NO audible human speech (e.g. only silence, breathing, background noise, or clicks), "
+                                "reply with exactly: NO_SPEECH\n"
+                                "If there is human speech, transcribe the spoken words accurately.\n"
+                                "Return ONLY the transcription or NO_SPEECH. No quotes, no markdown, no filler."
+                            )
+                        },
+                        {
+                            "inline_data": {
+                                "mime_type": mime_type,
+                                "data": __import__("base64").b64encode(audio_bytes).decode("utf-8"),
+                            }
+                        },
                     ],
                 }
             ],
+            config=types.GenerateContentConfig(
+                temperature=0.0,
+            ),
         )
-        return response.text.strip() if response.text else ""
+        raw_text = (response.text or "").strip()
+        print(f"[Gemini STT Output] Raw: {repr(raw_text)}")
+
+        if not raw_text or "NO_SPEECH" in raw_text.upper():
+            return ""
+
+        # Remove surrounding quotes or punctuation artifacts if present
+        return raw_text.strip(" '\"\n\r")
     except Exception as e:
         print(f"[Gemini STT Error] {e}")
         return ""

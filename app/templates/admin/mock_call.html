@@ -108,9 +108,22 @@
                     <span id="voice-pulse-dot" style="display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: #64748b;"></span>
                     <span id="voice-status-msg">Voice Channel Ready</span>
                 </span>
-                <span style="font-size: 0.72rem; color: #64748b; text-transform: uppercase; font-family: monospace;">GEMINI STT</span>
+                <div style="display: flex; align-items: center; gap: 8px;">
+                    <span id="mic-volume-badge" style="font-size: 0.72rem; font-weight: 700; padding: 2px 8px; border-radius: 4px; background: rgba(148,163,184,0.1); color: #94a3b8; font-family: monospace;">Mic Vol: 0%</span>
+                    <span style="font-size: 0.72rem; color: #38bdf8; text-transform: uppercase; font-family: monospace; font-weight: 600;">GEMINI STT (T=0)</span>
+                </div>
             </div>
-            <canvas id="audio-wave-canvas" width="600" height="48" style="width: 100%; height: 48px; display: block; border-radius: 4px; background: #020617;"></canvas>
+            <!-- Real Mic Waveform Canvas (flat when silent, bounces when sound is detected) -->
+            <canvas id="audio-wave-canvas" width="600" height="48" style="width: 100%; height: 48px; display: block; border-radius: 4px; background: #020617; border: 1px solid rgba(255,255,255,0.05);"></canvas>
+            
+            <!-- Mic Device Selector Bar -->
+            <div style="display: flex; gap: 8px; align-items: center; margin-top: 6px; padding: 4px 6px; background: rgba(15,23,42,0.6); border-radius: 6px; border: 1px solid rgba(255,255,255,0.05);">
+                <span style="font-size: 0.72rem; color: #94a3b8; white-space: nowrap;">🎤 Mic Input:</span>
+                <select id="mic-device-select" onchange="switchMicDevice()" style="flex: 1; font-size: 0.72rem; padding: 3px 6px; background: #0f172a; border: 1px solid #334155; color: #e2e8f0; border-radius: 4px; outline: none; cursor: pointer;">
+                    <option value="">Default Microphone</option>
+                </select>
+                <button type="button" onclick="testMicSound()" style="font-size: 0.7rem; padding: 3px 8px; background: #1e293b; border: 1px solid #475569; color: #38bdf8; border-radius: 4px; cursor: pointer; font-weight: 600;">Test Mic</button>
+            </div>
         </div>
 
         <!-- Input Box -->
@@ -232,6 +245,10 @@ let recordedChunks = [];
 let isRecording = false;
 let isAgentSpeaking = false;
 let animFrameId = null;
+let currentMicDeviceId = '';
+let maxRecordedVolume = 0;
+let isTestingMic = false;
+let testMicTimeout = null;
 
 function toggleAudio() {
     audioEnabled = !audioEnabled;
@@ -281,24 +298,96 @@ function showMicNotice(msg, isError) {
     n.style.background = isError ? "rgba(239,68,68,0.12)" : "rgba(245,158,11,0.1)";
 }
 
-async function initMicStream() {
+async function enumerateAudioDevices() {
+    try {
+        const devices = await navigator.mediaDevices.enumerateDevices();
+        const micSelect = document.getElementById("mic-device-select");
+        if (!micSelect) return;
+        
+        const audioInputs = devices.filter(d => d.kind === 'audioinput');
+        if (audioInputs.length > 0) {
+            micSelect.innerHTML = '';
+            audioInputs.forEach((device, idx) => {
+                const opt = document.createElement('option');
+                opt.value = device.deviceId;
+                opt.text = device.label || ('Microphone ' + (idx + 1));
+                micSelect.appendChild(opt);
+            });
+            if (currentMicDeviceId) {
+                micSelect.value = currentMicDeviceId;
+            }
+        }
+    } catch (e) {
+        console.warn("Could not enumerate audio devices:", e);
+    }
+}
+
+async function switchMicDevice() {
+    const micSelect = document.getElementById("mic-device-select");
+    if (!micSelect) return;
+    currentMicDeviceId = micSelect.value;
+    
+    // Release existing stream
+    if (micStream) {
+        micStream.getTracks().forEach(t => t.stop());
+        micStream = null;
+    }
+    await initMicStream(true);
+}
+
+async function initMicStream(forceNew = false) {
     try {
         if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
         if (audioCtx.state === 'suspended') await audioCtx.resume();
 
-        if (!micStream) {
-            micStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        if (!micStream || forceNew) {
+            const constraints = {
+                audio: {
+                    deviceId: currentMicDeviceId ? { exact: currentMicDeviceId } : undefined,
+                    echoCancellation: true,
+                    noiseSuppression: true,
+                    autoGainControl: true,
+                }
+            };
+            micStream = await navigator.mediaDevices.getUserMedia(constraints);
             const source = audioCtx.createMediaStreamSource(micStream);
             analyser = audioCtx.createAnalyser();
             analyser.fftSize = 64;
+            analyser.smoothingTimeConstant = 0.5;
             source.connect(analyser);
+
+            // Populate device list with labels after permission granted
+            await enumerateAudioDevices();
         }
         return true;
     } catch (err) {
         console.error("Mic init error:", err);
-        showMicNotice("Microphone access denied. Please allow microphone in browser settings.", true);
+        showMicNotice("Microphone access denied or error: " + err.message, true);
         return false;
     }
+}
+
+async function testMicSound() {
+    if (isRecording) return;
+    const ok = await initMicStream();
+    if (!ok) return;
+    
+    isTestingMic = true;
+    showMicNotice("Testing Mic: Speak now to test if sound is detected...", false);
+    setVoiceStatus("Testing Microphone... Speak now!", "#38bdf8", true);
+    
+    if (testMicTimeout) clearTimeout(testMicTimeout);
+    testMicTimeout = setTimeout(() => {
+        isTestingMic = false;
+        setVoiceStatus("Ready for your turn", "#94a3b8", false);
+        const volBadge = document.getElementById("mic-volume-badge");
+        const currentVol = volBadge ? volBadge.innerText : "";
+        if (maxRecordedVolume > 5) {
+            showMicNotice("✅ Mic sound detected successfully! (" + currentVol + ")", false);
+        } else {
+            showMicNotice("⚠️ 0% sound detected! Your selected mic is silent or muted. Switch mic device in dropdown or check Windows Sound Settings.", true);
+        }
+    }, 4000);
 }
 
 function startVisualizerLoop() {
@@ -312,7 +401,31 @@ function startVisualizerLoop() {
 
     function render() {
         animFrameId = requestAnimationFrame(render);
-        if (isRecording && analyser) analyser.getByteFrequencyData(dataArr);
+        
+        const activeListening = isRecording || isTestingMic;
+        if (activeListening && analyser) {
+            analyser.getByteFrequencyData(dataArr);
+            
+            // Calculate real decibel/energy level
+            let sum = 0;
+            for (let k = 0; k < bufLen; k++) sum += dataArr[k];
+            const avgVol = Math.min(100, Math.round((sum / (bufLen * 255)) * 100 * 2.2));
+            if (avgVol > maxRecordedVolume) maxRecordedVolume = avgVol;
+            
+            const volBadge = document.getElementById("mic-volume-badge");
+            if (volBadge) {
+                volBadge.innerText = "Mic Vol: " + avgVol + "%";
+                volBadge.style.color = avgVol > 8 ? "#34d399" : (avgVol > 2 ? "#fbbf24" : "#f87171");
+                volBadge.style.background = avgVol > 8 ? "rgba(52,211,153,0.15)" : "rgba(248,113,113,0.15)";
+            }
+        } else if (!isAgentSpeaking) {
+            const volBadge = document.getElementById("mic-volume-badge");
+            if (volBadge && !isRecording) {
+                volBadge.innerText = "Mic Vol: 0%";
+                volBadge.style.color = "#94a3b8";
+                volBadge.style.background = "rgba(148,163,184,0.1)";
+            }
+        }
 
         ctx.fillStyle = "#020617";
         ctx.fillRect(0, 0, w, h);
@@ -322,33 +435,33 @@ function startVisualizerLoop() {
 
         for (let i = 0; i < barCount; i++) {
             let mag = 0;
-            if (isRecording) {
-                const v = (analyser && dataArr[i]) ? dataArr[i] : 10;
+            if (activeListening) {
+                // REAL AUDIO ONLY: If there is no real sound, magnitude stays 0 (no fake sine wave)
+                const v = (analyser && dataArr[i]) ? dataArr[i] : 0;
                 mag = (v / 255) * h;
-                if (mag < 3) mag = 3 + Math.sin(i * 0.5 + Date.now() * 0.006) * 3;
+                if (mag < 1.5) mag = 0;
             } else if (isAgentSpeaking) {
                 mag = 8 + Math.sin(i * 0.4 + Date.now() * 0.012) * 16 + Math.cos(i * 0.2 + Date.now() * 0.009) * 8;
                 mag = Math.max(3, Math.min(h - 4, mag));
             } else {
-                // Idle calm line
-                mag = 2 + Math.sin(i * 0.3 + Date.now() * 0.002) * 2;
+                mag = 0; // Flat calm line
             }
 
             const x = i * barW;
             const y = h - mag;
             const grad = ctx.createLinearGradient(0, h, 0, y);
-            if (isRecording) {
+            if (activeListening) {
                 grad.addColorStop(0, '#059669');
                 grad.addColorStop(1, '#34d399');
             } else if (isAgentSpeaking) {
                 grad.addColorStop(0, '#0284c7');
                 grad.addColorStop(1, '#38bdf8');
             } else {
-                grad.addColorStop(0, 'rgba(148,163,184,0.15)');
-                grad.addColorStop(1, 'rgba(148,163,184,0.3)');
+                grad.addColorStop(0, 'rgba(148,163,184,0.1)');
+                grad.addColorStop(1, 'rgba(148,163,184,0.1)');
             }
             ctx.fillStyle = grad;
-            ctx.fillRect(x + 2, y, barW - 4, mag);
+            ctx.fillRect(x + 2, y, barW - 4, Math.max(1, mag));
         }
     }
     render();
@@ -548,6 +661,7 @@ async function toggleVoiceInput() {
 
     // Start MediaRecorder
     recordedChunks = [];
+    maxRecordedVolume = 0;
     try {
         // Prefer webm/opus, fallback to any supported
         const mimeOptions = ['audio/webm;codecs=opus', 'audio/webm', 'audio/ogg;codecs=opus', 'audio/mp4'];
@@ -574,6 +688,10 @@ async function toggleVoiceInput() {
             if (audioBlob.size < 100) {
                 showMicNotice("Recording too short. Hold Mic longer and speak clearly.", true);
                 return;
+            }
+
+            if (maxRecordedVolume < 4) {
+                showMicNotice("⚠️ Warning: 0% sound detected during recording! Your mic may be muted or silent.", true);
             }
 
             // Show processing state
@@ -640,3 +758,9 @@ async function toggleVoiceInput() {
 }
 </script>
 {% endblock %}
+
+<script>
+document.addEventListener("DOMContentLoaded", async () => {
+    try { await enumerateAudioDevices(); } catch(e) {}
+});
+</script>
