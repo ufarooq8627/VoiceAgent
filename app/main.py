@@ -1,3 +1,4 @@
+from pathlib import Path
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
@@ -31,7 +32,9 @@ app.add_middleware(
     max_age=86400 * 7,
 )
 
-app.mount("/static", StaticFiles(directory="app/static"), name="static")
+STATIC_DIR = Path(__file__).resolve().parent / "static"
+STATIC_DIR.mkdir(parents=True, exist_ok=True)
+app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
 
 app.include_router(auth.router)
 app.include_router(admin.router)
