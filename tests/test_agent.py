@@ -22,13 +22,16 @@ def agent_setup(db_session):
     transition_candidate(db_session, candidate.id, CandidateStatus.SHORTLISTED, "recruiter")
     transition_candidate(db_session, candidate.id, CandidateStatus.INVITED, "system")
 
-    from datetime import datetime, timezone
+    from datetime import datetime, timezone, timedelta
+    future = datetime.now(timezone.utc) + timedelta(days=7)
+    start_at = future.replace(hour=10, minute=0, second=0, microsecond=0)
+    end_at = future.replace(hour=11, minute=0, second=0, microsecond=0)
     SlotService.create_slots(
         db_session,
         job.id,
         interviewer.id,
-        start_at_utc=datetime(2026, 10, 8, 10, 0, tzinfo=timezone.utc),
-        end_at_utc=datetime(2026, 10, 8, 11, 0, tzinfo=timezone.utc),
+        start_at_utc=start_at,
+        end_at_utc=end_at,
         duration_minutes=30,
     )
 

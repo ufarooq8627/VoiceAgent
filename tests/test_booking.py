@@ -5,6 +5,12 @@ from app.services.state_machine import transition_candidate, CandidateStatus
 from app.services.slot_service import SlotService
 
 
+# Use a future base date so slots remain "open" regardless of when tests run
+def _future_dt(days_ahead=7, hour=10, minute=0):
+    base = datetime.now(timezone.utc) + timedelta(days=days_ahead)
+    return base.replace(hour=hour, minute=minute, second=0, microsecond=0)
+
+
 @pytest.fixture
 def setup_job_and_interviewer(db_session):
     job = Job(title="Backend Engineer", description="Python/FastAPI")
@@ -28,8 +34,8 @@ def candidate_invited(db_session, setup_job_and_interviewer):
 
 def test_create_slots_from_window(db_session, setup_job_and_interviewer):
     job, interviewer = setup_job_and_interviewer
-    start = datetime(2026, 10, 5, 10, 0, tzinfo=timezone.utc)
-    end = datetime(2026, 10, 5, 12, 0, tzinfo=timezone.utc)
+    start = _future_dt(days_ahead=7, hour=10)
+    end = _future_dt(days_ahead=7, hour=12)
     slots = SlotService.create_slots(
         db=db_session,
         job_id=job.id,
@@ -47,8 +53,8 @@ def test_create_slots_from_window(db_session, setup_job_and_interviewer):
 def test_book_slot_atomically(db_session, setup_job_and_interviewer, candidate_invited):
     job, interviewer = setup_job_and_interviewer
     candidate = candidate_invited
-    start = datetime(2026, 10, 5, 14, 0, tzinfo=timezone.utc)
-    end = datetime(2026, 10, 5, 14, 30, tzinfo=timezone.utc)
+    start = _future_dt(days_ahead=8, hour=14)
+    end = _future_dt(days_ahead=8, hour=14, minute=30)
     slots = SlotService.create_slots(
         db_session, job.id, interviewer.id, start, end, duration_minutes=30
     )
@@ -76,8 +82,8 @@ def test_double_booking_prevented(db_session, setup_job_and_interviewer, candida
     transition_candidate(db_session, c2.id, CandidateStatus.SHORTLISTED, "recruiter")
     transition_candidate(db_session, c2.id, CandidateStatus.INVITED, "system")
 
-    start = datetime(2026, 10, 5, 15, 0, tzinfo=timezone.utc)
-    end = datetime(2026, 10, 5, 15, 30, tzinfo=timezone.utc)
+    start = _future_dt(days_ahead=9, hour=15)
+    end = _future_dt(days_ahead=9, hour=15, minute=30)
     slots = SlotService.create_slots(
         db_session, job.id, interviewer.id, start, end, duration_minutes=30
     )
@@ -95,8 +101,8 @@ def test_double_booking_prevented(db_session, setup_job_and_interviewer, candida
 
 def test_get_available_returns_only_open(db_session, setup_job_and_interviewer, candidate_invited):
     job, interviewer = setup_job_and_interviewer
-    start = datetime(2026, 10, 6, 10, 0, tzinfo=timezone.utc)
-    end = datetime(2026, 10, 6, 11, 30, tzinfo=timezone.utc)
+    start = _future_dt(days_ahead=10, hour=10)
+    end = _future_dt(days_ahead=10, hour=11, minute=30)
     slots = SlotService.create_slots(
         db_session, job.id, interviewer.id, start, end, duration_minutes=30
     )
@@ -115,8 +121,8 @@ def test_get_available_returns_only_open(db_session, setup_job_and_interviewer, 
 
 def test_cancel_slot(db_session, setup_job_and_interviewer):
     job, interviewer = setup_job_and_interviewer
-    start = datetime(2026, 10, 7, 10, 0, tzinfo=timezone.utc)
-    end = datetime(2026, 10, 7, 10, 30, tzinfo=timezone.utc)
+    start = _future_dt(days_ahead=11, hour=10)
+    end = _future_dt(days_ahead=11, hour=10, minute=30)
     slots = SlotService.create_slots(
         db_session, job.id, interviewer.id, start, end, duration_minutes=30
     )
