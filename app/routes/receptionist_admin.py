@@ -63,8 +63,15 @@ def export_enquiries(format: str = "xlsx", db: Session = Depends(get_db)):
         csv_stream = ReceptionistExportService.export_enquiries_csv(db)
         return Response(
             content=csv_stream.getvalue(),
-            media_type="text/csv",
+            media_type="text/csv; charset=utf-8",
             headers={"Content-Disposition": "attachment; filename=receptionist_enquiries.csv"},
+        )
+    elif fmt == "json":
+        json_data = ReceptionistExportService.export_enquiries_json(db)
+        return Response(
+            content=json_data,
+            media_type="application/json; charset=utf-8",
+            headers={"Content-Disposition": "attachment; filename=receptionist_enquiries.json"},
         )
     else:
         excel_stream = ReceptionistExportService.export_enquiries_xlsx(db)

@@ -4,20 +4,27 @@
 {% block page_title %}Unanswered Customer Enquiries{% endblock %}
 
 {% block topbar_actions %}
-<div style="display: flex; gap: 10px; align-items: center;">
+<div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
     <a href="/admin/receptionist/export?format=xlsx" 
        download="receptionist_enquiries.xlsx" 
        hx-boost="false" 
        class="btn btn-outline btn-sm" 
        style="display: flex; align-items: center; gap: 6px; border-radius: 8px;">
-        <span>📊</span> Export to Excel (.xlsx)
+        <span>📊</span> Excel (.xlsx)
     </a>
     <a href="/admin/receptionist/export?format=csv" 
        download="receptionist_enquiries.csv" 
        hx-boost="false" 
        class="btn btn-outline btn-sm" 
        style="display: flex; align-items: center; gap: 6px; border-radius: 8px;">
-        <span>📄</span> Export to CSV (.csv)
+        <span>📄</span> CSV (.csv)
+    </a>
+    <a href="/admin/receptionist/export?format=json" 
+       download="receptionist_enquiries.json" 
+       hx-boost="false" 
+       class="btn btn-outline btn-sm" 
+       style="display: flex; align-items: center; gap: 6px; border-radius: 8px;">
+        <span>📦</span> JSON (.json)
     </a>
 </div>
 {% endblock %}

@@ -159,3 +159,39 @@ class ReceptionistExportService:
         output.seek(0)
         return output
 
+    @staticmethod
+    def export_enquiries_json(db: Session, business_id: str | None = None) -> str:
+        import json
+        query = db.query(UnansweredEnquiry)
+        if business_id:
+            query = query.filter(UnansweredEnquiry.business_id == business_id)
+        enquiries = query.order_by(UnansweredEnquiry.created_at.desc()).all()
+
+        data = []
+        for enq in enquiries:
+            kb_exists = (
+                db.query(KnowledgeItem)
+                .filter(
+                    KnowledgeItem.business_id == enq.business_id,
+                    KnowledgeItem.question == enq.question,
+                )
+                .first()
+            )
+            caller_phone = enq.call.caller_number if (enq.call and enq.call.caller_number) else ""
+            biz_name = enq.business.name if enq.business else ""
+
+            data.append({
+                "enquiry_id": enq.id,
+                "business_id": enq.business_id,
+                "business_name": biz_name,
+                "call_id": enq.call_id or "",
+                "caller_phone": caller_phone,
+                "question": enq.question,
+                "status": enq.status,
+                "owner_answer": enq.owner_answer or "",
+                "created_at": enq.created_at.isoformat() if enq.created_at else None,
+                "resolved_at": enq.resolved_at.isoformat() if enq.resolved_at else None,
+                "published_to_kb": bool(kb_exists),
+            })
+        return json.dumps(data, indent=2, ensure_ascii=False)
+
