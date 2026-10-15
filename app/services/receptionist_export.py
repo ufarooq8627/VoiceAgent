@@ -101,3 +101,61 @@ class ReceptionistExportService:
         wb.save(output)
         output.seek(0)
         return output
+
+    @staticmethod
+    def export_enquiries_csv(db: Session, business_id: str | None = None) -> io.StringIO:
+        import csv
+        output = io.StringIO()
+        writer = csv.writer(output)
+
+        headers = [
+            "enquiry_id",
+            "business_id",
+            "business_name",
+            "call_id",
+            "caller_phone",
+            "question",
+            "status",
+            "owner_answer",
+            "created_at",
+            "resolved_at",
+            "published_to_kb",
+        ]
+        writer.writerow(headers)
+
+        query = db.query(UnansweredEnquiry)
+        if business_id:
+            query = query.filter(UnansweredEnquiry.business_id == business_id)
+        enquiries = query.order_by(UnansweredEnquiry.created_at.desc()).all()
+
+        for enq in enquiries:
+            kb_exists = (
+                db.query(KnowledgeItem)
+                .filter(
+                    KnowledgeItem.business_id == enq.business_id,
+                    KnowledgeItem.question == enq.question,
+                )
+                .first()
+            )
+            published_to_kb = "yes" if kb_exists else "no"
+            caller_phone = enq.call.caller_number if (enq.call and enq.call.caller_number) else ""
+            biz_name = enq.business.name if enq.business else ""
+
+            row_data = [
+                enq.id,
+                enq.business_id,
+                biz_name,
+                enq.call_id or "",
+                caller_phone,
+                enq.question,
+                enq.status,
+                enq.owner_answer or "",
+                enq.created_at.isoformat() if enq.created_at else "",
+                enq.resolved_at.isoformat() if enq.resolved_at else "",
+                published_to_kb,
+            ]
+            writer.writerow(row_data)
+
+        output.seek(0)
+        return output
+

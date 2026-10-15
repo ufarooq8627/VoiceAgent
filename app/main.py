@@ -1,3 +1,4 @@
+from fastapi.responses import RedirectResponse
 from pathlib import Path
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
@@ -60,3 +61,8 @@ app.include_router(telephony_api.router)
 @app.get("/health")
 def health():
     return {"status": "ok"}
+
+
+@app.get("/")
+def root_redirect():
+    return RedirectResponse(url="/admin/mock-call", status_code=303)

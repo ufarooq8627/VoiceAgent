@@ -5,7 +5,7 @@
 
 {% block topbar_actions %}
 <div style="display: flex; gap: 0.75rem;">
-    <a href="/admin/jobs/{{ job.id }}/export" class="btn btn-secondary btn-sm" download>
+    <a href="/admin/jobs/{{ job.id }}/export" class="btn btn-secondary btn-sm" download hx-boost="false">
         <span>📊</span>
         <span>Export Excel</span>
     </a>

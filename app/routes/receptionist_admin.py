@@ -57,10 +57,19 @@ def resolve_enquiry(
 
 
 @router.get("/export")
-def export_enquiries(db: Session = Depends(get_db)):
-    excel_stream = ReceptionistExportService.export_enquiries_xlsx(db)
-    return Response(
-        content=excel_stream.getvalue(),
-        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        headers={"Content-Disposition": "attachment; filename=receptionist_enquiries.xlsx"},
-    )
+def export_enquiries(format: str = "xlsx", db: Session = Depends(get_db)):
+    fmt = format.lower().strip()
+    if fmt == "csv":
+        csv_stream = ReceptionistExportService.export_enquiries_csv(db)
+        return Response(
+            content=csv_stream.getvalue(),
+            media_type="text/csv",
+            headers={"Content-Disposition": "attachment; filename=receptionist_enquiries.csv"},
+        )
+    else:
+        excel_stream = ReceptionistExportService.export_enquiries_xlsx(db)
+        return Response(
+            content=excel_stream.getvalue(),
+            media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            headers={"Content-Disposition": "attachment; filename=receptionist_enquiries.xlsx"},
+        )
