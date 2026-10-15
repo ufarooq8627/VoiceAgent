@@ -1,3 +1,12 @@
+_client = None
+
+def get_gemini_client():
+    global _client
+    if _client is None:
+        from google import genai
+        _client = genai.Client(api_key=settings.llm_api_key)
+    return _client
+
 from dataclasses import dataclass, field
 from app.agent.receptionist_tools import ReceptionistTools
 from app.config import settings
@@ -80,8 +89,7 @@ class GeminiReceptionistAgent:
 
         # 4. Generate Grounded Response via Gemini
         try:
-            from google import genai
-            client = genai.Client(api_key=settings.llm_api_key)
+            client = get_gemini_client()
 
             prompt = f"""You are the AI voice receptionist for {self.business_name}.
 Verified Business Knowledge:

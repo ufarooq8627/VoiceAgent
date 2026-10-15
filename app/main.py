@@ -13,12 +13,22 @@ from app.agent.worker import start_scheduler, stop_scheduler
 from app.limiter import limiter
 
 
+import logging
+logger = logging.getLogger("app.main")
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     Base.metadata.create_all(bind=engine)
-    start_scheduler()
+    if settings.is_production and settings.app_secret_key in ("change-me", "default", "secret", ""):
+        logger.warning("[CRITICAL SECURITY WARNING] APP_SECRET_KEY is using a default insecure value! Set a random 32+ char key in .env.")
+    if settings.is_production and not settings.admin_password_hash:
+        logger.warning("[CRITICAL SECURITY WARNING] ADMIN_PASSWORD_HASH is empty in production mode! Admin dashboard login will be disabled until set.")
+    
+    if settings.enable_scheduler:
+        start_scheduler()
     yield
-    stop_scheduler()
+    if settings.enable_scheduler:
+        stop_scheduler()
 
 
 app = FastAPI(title="Recruitment Agent", version="0.1.0", lifespan=lifespan)
@@ -30,6 +40,8 @@ app.add_middleware(
     secret_key=settings.app_secret_key,
     session_cookie="recruitment_admin_session",
     max_age=86400 * 7,
+    same_site="lax",
+    https_only=settings.is_production,
 )
 
 STATIC_DIR = Path(__file__).resolve().parent / "static"

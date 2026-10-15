@@ -1,3 +1,7 @@
+import logging
+from starlette.concurrency import run_in_threadpool
+from app.config import settings
+logger = logging.getLogger("app.telephony")
 """
 Telephony Webhook Routes for Twilio (TwiML) and Telnyx (TeXML).
 
@@ -23,6 +27,15 @@ from app.agent.receptionist_agent import GeminiReceptionistAgent
 from app.agent.receptionist_tools import ReceptionistTools
 
 router = APIRouter(prefix="/api/telephony", tags=["Telephony Webhooks"])
+
+def _verify_telephony_token(request: Request):
+    """Optional security guard: reject requests if telephony_webhook_token is set and doesn't match."""
+    token = getattr(settings, "telephony_webhook_token", "")
+    if token:
+        provided = request.headers.get("X-Telephony-Token") or request.query_params.get("token")
+        if provided != token:
+            raise HTTPException(status_code=403, detail="Forbidden: Invalid telephony webhook token.")
+
 
 
 def _generate_twiml_response(reply_text: str, action_url: str, is_final: bool = False) -> str:
@@ -157,7 +170,18 @@ async def twilio_voice_gather(
     agent = GeminiReceptionistAgent(business_name=business_name, tools=tools)
 
     history = list(call.transcript or [])
-    turn_result = agent.process_turn(history=history, caller_message=user_text)
+    try:
+        turn_result = await run_in_threadpool(
+            agent.process_turn,
+            history=history,
+            caller_message=user_text,
+        )
+    except Exception as exc:
+        logger.error(f"[Twilio Voice Gather Error] {exc}", exc_info=True)
+        gather_url = f"/api/telephony/twilio/gather?call_sid={call_sid}"
+        fallback_msg = "I am having a brief moment processing that. Could you please repeat your question?"
+        twiml = _generate_twiml_response(fallback_msg, action_url=gather_url)
+        return Response(content=twiml, media_type="application/xml")
 
     new_transcript = list(call.transcript or [])
     new_transcript.append({
@@ -280,7 +304,18 @@ async def telnyx_voice_gather(
     agent = GeminiReceptionistAgent(business_name=business_name, tools=tools)
 
     history = list(call.transcript or [])
-    turn_result = agent.process_turn(history=history, caller_message=user_text)
+    try:
+        turn_result = await run_in_threadpool(
+            agent.process_turn,
+            history=history,
+            caller_message=user_text,
+        )
+    except Exception as exc:
+        logger.error(f"[Telnyx Voice Gather Error] {exc}", exc_info=True)
+        gather_url = f"/api/telephony/telnyx/gather?call_sid={call_sid}"
+        fallback_msg = "I am having a brief moment processing that. Could you please repeat your question?"
+        texml = _generate_texml_response(fallback_msg, action_url=gather_url)
+        return Response(content=texml, media_type="application/xml")
 
     new_transcript = list(call.transcript or [])
     new_transcript.append({

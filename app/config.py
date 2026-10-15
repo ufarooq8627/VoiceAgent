@@ -22,6 +22,13 @@ class Settings(BaseSettings):
     agent_context_messages: int = 10
     agent_max_outbound_per_day: int = 6
     webhook_secret: str = ""            # empty => webhook disabled
+    telephony_webhook_token: str = ""   # if set, require token in telephony webhooks
+    environment: str = "development"     # development | production | test
+    enable_scheduler: bool = True        # enable background candidate email tick
+
+    @property
+    def is_production(self) -> bool:
+        return self.environment.lower() in ("production", "prod")
 
     @model_validator(mode="after")
     def validate_llm_config(self):

@@ -1,3 +1,5 @@
+from starlette.concurrency import run_in_threadpool
+from app.agent.receptionist_agent import get_gemini_client
 import uuid
 import tempfile
 import os
@@ -158,7 +160,8 @@ async def process_audio_turn(
     agent = GeminiReceptionistAgent(business_name=business_name, tools=tools)
     history = list(call.transcript or [])
 
-    turn_result = agent.process_turn(
+    turn_result = await run_in_threadpool(
+        agent.process_turn,
         history=history,
         caller_message=transcript_text.strip(),
     )
@@ -192,14 +195,14 @@ async def process_audio_turn(
 async def _transcribe_audio_with_gemini(audio_bytes: bytes, mime_type: str) -> str:
     """Use Gemini multimodal API to transcribe audio bytes to text with anti-hallucination guard."""
     try:
-        from google import genai
         from google.genai import types
 
-        client = genai.Client(api_key=settings.llm_api_key)
+        client = get_gemini_client()
         model_name = settings.llm_model or "gemini-3.5-flash-lite"
         print(f"[Gemini STT] Sending {len(audio_bytes)} bytes ({mime_type}) to {model_name}...")
 
-        response = client.models.generate_content(
+        response = await run_in_threadpool(
+            client.models.generate_content,
             model=model_name,
             contents=[
                 {

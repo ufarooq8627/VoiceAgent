@@ -38,11 +38,12 @@ async def login_submit(
                     password.encode("utf-8"),
                     settings.admin_password_hash.encode("utf-8"),
                 )
-            elif password == "admin123":
+            elif not settings.is_production and password == "admin123":
+                # Only allowed in non-production environments
                 valid = True
         except Exception:
             # Fallback for local development if hash format had an issue
-            if password == "admin123":
+            if not settings.is_production and password == "admin123":
                 valid = True
 
     if valid:

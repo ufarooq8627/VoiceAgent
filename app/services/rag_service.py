@@ -1,3 +1,4 @@
+from app.agent.receptionist_agent import get_gemini_client
 import math
 from typing import List, Dict, Any, Optional
 from datetime import datetime, timezone
@@ -33,8 +34,7 @@ class RAGService:
     def get_embedding(cls, text: str) -> Optional[List[float]]:
         """Compute 3072-dim vector embedding using Gemini API."""
         try:
-            from google import genai
-            client = genai.Client(api_key=settings.llm_api_key)
+            client = get_gemini_client()
             resp = client.models.embed_content(
                 model="gemini-embedding-001",
                 contents=text.strip(),
