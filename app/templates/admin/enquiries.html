@@ -4,29 +4,98 @@
 {% block page_title %}Unanswered Customer Enquiries{% endblock %}
 
 {% block topbar_actions %}
-<div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
-    <a href="/admin/receptionist/export/xlsx" 
-       download="receptionist_enquiries.xlsx" 
-       hx-boost="false" 
-       class="btn btn-outline btn-sm" 
-       style="display: flex; align-items: center; gap: 6px; border-radius: 8px;">
-        <span>📊</span> Excel (.xlsx)
-    </a>
-    <a href="/admin/receptionist/export/csv" 
-       download="receptionist_enquiries.csv" 
-       hx-boost="false" 
-       class="btn btn-outline btn-sm" 
-       style="display: flex; align-items: center; gap: 6px; border-radius: 8px;">
-        <span>📄</span> CSV (.csv)
-    </a>
-    <a href="/admin/receptionist/export/json" 
-       download="receptionist_enquiries.json" 
-       hx-boost="false" 
-       class="btn btn-outline btn-sm" 
-       style="display: flex; align-items: center; gap: 6px; border-radius: 8px;">
-        <span>📦</span> JSON (.json)
-    </a>
+<div class="export-dropdown-wrapper" style="position: relative; display: inline-block;">
+    <button id="exportDropdownBtn" 
+            type="button" 
+            class="btn btn-outline btn-sm" 
+            style="display: flex; align-items: center; gap: 8px; border-radius: 8px; background: rgba(30, 41, 59, 0.85); border: 1px solid rgba(255, 255, 255, 0.15); color: #f8fafc; font-weight: 500; padding: 7px 14px; cursor: pointer; transition: all 0.2s;"
+            onclick="toggleExportMenu(event)">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+            <polyline points="7 10 12 15 17 10"/>
+            <line x1="12" y1="15" x2="12" y2="3"/>
+        </svg>
+        <span>Export</span>
+        <svg id="exportChevron" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="transition: transform 0.2s; margin-left: 2px;">
+            <polyline points="6 9 12 15 18 9"></polyline>
+        </svg>
+    </button>
+    
+    <div id="exportMenu" 
+         style="display: none; position: absolute; right: 0; top: calc(100% + 8px); background: #1e293b; border: 1px solid rgba(255, 255, 255, 0.12); border-radius: 10px; box-shadow: 0 14px 32px rgba(0, 0, 0, 0.55); min-width: 220px; z-index: 1000; overflow: hidden; backdrop-filter: blur(12px);">
+        
+        <div style="padding: 8px 14px; font-size: 0.72rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: #94a3b8; border-bottom: 1px solid rgba(255, 255, 255, 0.06);">
+            Select Export Format
+        </div>
+
+        <a href="/admin/receptionist/export/xlsx" 
+           download="receptionist_enquiries.xlsx" 
+           hx-boost="false"
+           style="display: flex; align-items: center; gap: 12px; padding: 11px 16px; color: #f1f5f9; text-decoration: none; font-size: 0.88rem; transition: background 0.15s; border-bottom: 1px solid rgba(255, 255, 255, 0.06);"
+           onmouseover="this.style.background='rgba(59, 130, 246, 0.15)'" 
+           onmouseout="this.style.background='transparent'"
+           onclick="closeExportMenu()">
+            <span style="font-size: 1.25rem;">📊</span>
+            <div>
+                <div style="font-weight: 600; color: #f8fafc;">Excel Spreadsheet</div>
+                <div style="font-size: 0.73rem; color: #94a3b8;">Formatted .xlsx workbook</div>
+            </div>
+        </a>
+        
+        <a href="/admin/receptionist/export/csv" 
+           download="receptionist_enquiries.csv" 
+           hx-boost="false"
+           style="display: flex; align-items: center; gap: 12px; padding: 11px 16px; color: #f1f5f9; text-decoration: none; font-size: 0.88rem; transition: background 0.15s; border-bottom: 1px solid rgba(255, 255, 255, 0.06);"
+           onmouseover="this.style.background='rgba(59, 130, 246, 0.15)'" 
+           onmouseout="this.style.background='transparent'"
+           onclick="closeExportMenu()">
+            <span style="font-size: 1.25rem;">📄</span>
+            <div>
+                <div style="font-weight: 600; color: #f8fafc;">CSV File</div>
+                <div style="font-size: 0.73rem; color: #94a3b8;">Standard comma-separated</div>
+            </div>
+        </a>
+        
+        <a href="/admin/receptionist/export/json" 
+           download="receptionist_enquiries.json" 
+           hx-boost="false"
+           style="display: flex; align-items: center; gap: 12px; padding: 11px 16px; color: #f1f5f9; text-decoration: none; font-size: 0.88rem; transition: background 0.15s;"
+           onmouseover="this.style.background='rgba(59, 130, 246, 0.15)'" 
+           onmouseout="this.style.background='transparent'"
+           onclick="closeExportMenu()">
+            <span style="font-size: 1.25rem;">📦</span>
+            <div>
+                <div style="font-weight: 600; color: #f8fafc;">JSON Dataset</div>
+                <div style="font-size: 0.73rem; color: #94a3b8;">Structured JSON for AI & APIs</div>
+            </div>
+        </a>
+    </div>
 </div>
+
+<script>
+function toggleExportMenu(e) {
+    if (e) e.stopPropagation();
+    const menu = document.getElementById('exportMenu');
+    const chevron = document.getElementById('exportChevron');
+    const isOpen = menu && menu.style.display === 'block';
+    if (menu) menu.style.display = isOpen ? 'none' : 'block';
+    if (chevron) chevron.style.transform = isOpen ? 'rotate(0deg)' : 'rotate(180deg)';
+}
+
+function closeExportMenu() {
+    const menu = document.getElementById('exportMenu');
+    const chevron = document.getElementById('exportChevron');
+    if (menu) menu.style.display = 'none';
+    if (chevron) chevron.style.transform = 'rotate(0deg)';
+}
+
+document.addEventListener('click', function(e) {
+    const wrapper = document.querySelector('.export-dropdown-wrapper');
+    if (wrapper && !wrapper.contains(e.target)) {
+        closeExportMenu();
+    }
+});
+</script>
 {% endblock %}
 
 {% block content %}
