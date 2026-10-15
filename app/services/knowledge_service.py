@@ -10,42 +10,9 @@ class KnowledgeService:
 
     @classmethod
     def search_static(cls, db: Session, business_id: str, query: str) -> list[dict]:
-        now = datetime.now(timezone.utc)
-        STOPWORDS = {"and", "the", "is", "in", "at", "to", "of", "for", "a", "an", "on", "with", "do", "you", "are", "what", "where", "how", "your", "our"}
-        raw_terms = [t.strip().lower() for t in query.split() if len(t.strip()) > 1]
-        query_terms = [t for t in raw_terms if t not in STOPWORDS]
-        if not query_terms:
-            query_terms = raw_terms
-
-        items = (
-            db.query(KnowledgeItem)
-            .filter(
-                KnowledgeItem.business_id == business_id,
-                KnowledgeItem.status == "approved",
-                KnowledgeItem.valid_from <= now,
-                or_(
-                    KnowledgeItem.valid_until.is_(None),
-                    KnowledgeItem.valid_until >= now
-                )
-            )
-            .all()
-        )
-
-        results = []
-        for item in items:
-            content = f"{item.question} {item.answer} {item.category}".lower()
-            if not query_terms or any(term in content for term in query_terms):
-                results.append({
-                    "id": item.id,
-                    "question": item.question,
-                    "answer": item.answer,
-                    "category": item.category,
-                    "source": item.source,
-                    "status": item.status,
-                    "valid_from": item.valid_from.isoformat() if item.valid_from else None,
-                    "valid_until": item.valid_until.isoformat() if item.valid_until else None,
-                })
-        return results
+        """Semantic RAG search using Gemini vector embeddings."""
+        from app.services.rag_service import RAGService
+        return RAGService.search_knowledge(db, business_id, query)
 
     @classmethod
     def bulk_import_csv(cls, db: Session, business_id: str, csv_text: str) -> dict:
