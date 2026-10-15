@@ -57,16 +57,17 @@ def resolve_enquiry(
 
 
 @router.get("/export")
-def export_enquiries(format: str = "xlsx", db: Session = Depends(get_db)):
-    fmt = format.lower().strip()
-    if fmt == "csv":
+@router.get("/export/{format_type}")
+def export_enquiries(format_type: str = None, format: str = "xlsx", db: Session = Depends(get_db)):
+    selected = (format_type or format or "xlsx").lower().strip()
+    if selected == "csv":
         csv_stream = ReceptionistExportService.export_enquiries_csv(db)
         return Response(
             content=csv_stream.getvalue(),
             media_type="text/csv; charset=utf-8",
             headers={"Content-Disposition": "attachment; filename=receptionist_enquiries.csv"},
         )
-    elif fmt == "json":
+    elif selected == "json":
         json_data = ReceptionistExportService.export_enquiries_json(db)
         return Response(
             content=json_data,
