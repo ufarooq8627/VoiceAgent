@@ -16,8 +16,9 @@ from app.models.receptionist import Business, BusinessPhoneNumber, Call
 from app.agent.receptionist_agent import GeminiReceptionistAgent
 from app.agent.receptionist_tools import ReceptionistTools
 from app.config import settings
+from app.routes.auth import login_required
 
-router = APIRouter(tags=["receptionist"])
+router = APIRouter(tags=["receptionist"], dependencies=[Depends(login_required)])
 templates = Jinja2Templates(directory="app/templates")
 
 

@@ -1,4 +1,4 @@
-import pytest
+﻿import pytest
 from datetime import datetime, timezone
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
@@ -7,6 +7,7 @@ from sqlalchemy.orm import sessionmaker
 
 from app.database import Base, get_db
 from app.models.receptionist import Business, BusinessPhoneNumber, Call
+from app.routes.auth import login_required
 from app.main import app
 
 engine = create_engine(
@@ -55,9 +56,55 @@ def client():
     app.dependency_overrides.pop(get_db, None)
 
 
-def test_start_call_registered_and_unregistered(client):
-    # Registered number
+@pytest.fixture
+def auth_client():
+    app.dependency_overrides[get_db] = override_get_db
+    app.dependency_overrides[login_required] = lambda: "admin"
+    yield TestClient(app)
+    app.dependency_overrides.pop(login_required, None)
+    app.dependency_overrides.pop(get_db, None)
+
+
+# --- NEGATIVE PERIMETER TESTS (UNAUTHENTICATED) ---
+
+def test_mock_call_page_unauthenticated_redirects(client):
+    res = client.get("/admin/mock-call", follow_redirects=False)
+    assert res.status_code == 303
+    assert res.headers["location"] == "/admin/login"
+
+
+def test_start_call_unauthenticated_returns_401(client):
     res = client.post(
+        "/api/receptionist/calls/start",
+        json={"dialed_number": "+15550001111", "caller_number": "+19998887777"},
+    )
+    assert res.status_code == 401
+    assert res.json()["detail"] == "Authentication required"
+
+
+def test_turn_call_unauthenticated_returns_401(client):
+    res = client.post(
+        "/api/receptionist/calls/fake-call-id/turn",
+        json={"caller_message": "Hello"},
+    )
+    assert res.status_code == 401
+    assert res.json()["detail"] == "Authentication required"
+
+
+def test_end_call_unauthenticated_returns_401(client):
+    res = client.post(
+        "/api/receptionist/calls/fake-call-id/end",
+        json={"summary": "done"},
+    )
+    assert res.status_code == 401
+    assert res.json()["detail"] == "Authentication required"
+
+
+# --- POSITIVE FLOW TESTS (AUTHENTICATED) ---
+
+def test_start_call_registered_and_unregistered(auth_client):
+    # Registered number
+    res = auth_client.post(
         "/api/receptionist/calls/start",
         json={
             "dialed_number": "+15550001111",
@@ -73,7 +120,7 @@ def test_start_call_registered_and_unregistered(client):
     assert "AI" in data["greeting"]
 
     # Unregistered number
-    res2 = client.post(
+    res2 = auth_client.post(
         "/api/receptionist/calls/start",
         json={
             "dialed_number": "+19999999999",
@@ -83,16 +130,16 @@ def test_start_call_registered_and_unregistered(client):
     assert res2.status_code == 404
 
 
-def test_call_turn_flow(client):
+def test_call_turn_flow(auth_client):
     # Start call first
-    res = client.post(
+    res = auth_client.post(
         "/api/receptionist/calls/start",
         json={"dialed_number": "+15550001111", "caller_number": "+15559998888"},
     )
     call_id = res.json()["call_id"]
 
     # Send turn
-    turn_res = client.post(
+    turn_res = auth_client.post(
         f"/api/receptionist/calls/{call_id}/turn",
         json={"caller_message": "What time do you open tomorrow?"},
     )
@@ -112,14 +159,14 @@ def test_call_turn_flow(client):
     db.close()
 
 
-def test_end_call_flow(client):
-    res = client.post(
+def test_end_call_flow(auth_client):
+    res = auth_client.post(
         "/api/receptionist/calls/start",
         json={"dialed_number": "+15550001111", "caller_number": "+15559998888"},
     )
     call_id = res.json()["call_id"]
 
-    end_res = client.post(
+    end_res = auth_client.post(
         f"/api/receptionist/calls/{call_id}/end",
         json={"summary": "Caller enquired about opening hours."},
     )
@@ -135,7 +182,7 @@ def test_end_call_flow(client):
     db.close()
 
 
-def test_mock_call_simulator_page_renders(client):
-    res = client.get("/admin/mock-call")
+def test_mock_call_simulator_page_renders(auth_client):
+    res = auth_client.get("/admin/mock-call")
     assert res.status_code == 200
     assert "Voice Receptionist Simulator" in res.text
