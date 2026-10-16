@@ -26,15 +26,23 @@ from app.models.receptionist import Business, BusinessPhoneNumber, Call
 from app.agent.receptionist_agent import GeminiReceptionistAgent
 from app.agent.receptionist_tools import ReceptionistTools
 
-router = APIRouter(prefix="/api/telephony", tags=["Telephony Webhooks"])
-
-def _verify_telephony_token(request: Request):
-    """Optional security guard: reject requests if telephony_webhook_token is set and doesn't match."""
+def verify_telephony_auth(request: Request):
+    """Enforce webhook token authentication across all telephony endpoints."""
     token = getattr(settings, "telephony_webhook_token", "")
     if token:
         provided = request.headers.get("X-Telephony-Token") or request.query_params.get("token")
-        if provided != token:
-            raise HTTPException(status_code=403, detail="Forbidden: Invalid telephony webhook token.")
+        if not provided or provided != token:
+            raise HTTPException(
+                status_code=403,
+                detail="Forbidden: Invalid or missing telephony webhook token."
+            )
+    return True
+
+router = APIRouter(
+    prefix="/api/telephony",
+    dependencies=[Depends(verify_telephony_auth)],
+    tags=["Telephony Webhooks"],
+)
 
 
 
