@@ -23,6 +23,7 @@ class Settings(BaseSettings):
     agent_max_outbound_per_day: int = 6
     webhook_secret: str = ""            # empty => webhook disabled
     telephony_webhook_token: str = ""   # if set, require token in telephony webhooks
+    cors_origins: str = "http://localhost:8000,http://127.0.0.1:8000"
     environment: str = "development"     # development | production | test
     enable_scheduler: bool = True        # enable background candidate email tick
 
