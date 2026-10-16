@@ -4,6 +4,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 
 from app.config import settings
+from app.limiter import limiter
 
 templates = Jinja2Templates(directory="app/templates")
 router = APIRouter(prefix="/admin", tags=["auth"])
@@ -27,6 +28,7 @@ async def login_page(request: Request):
 
 
 @router.post("/login", response_class=HTMLResponse)
+@limiter.limit("5/minute")
 async def login_submit(
     request: Request,
     username: str = Form(...),

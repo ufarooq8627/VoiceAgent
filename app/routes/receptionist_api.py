@@ -16,6 +16,7 @@ from app.models.receptionist import Business, BusinessPhoneNumber, Call
 from app.agent.receptionist_agent import GeminiReceptionistAgent
 from app.agent.receptionist_tools import ReceptionistTools
 from app.config import settings
+from app.limiter import limiter
 from app.routes.auth import login_required
 
 router = APIRouter(tags=["receptionist"], dependencies=[Depends(login_required)])
@@ -37,7 +38,8 @@ class EndCallRequest(BaseModel):
 
 
 @router.post("/api/receptionist/calls/start")
-def start_call(payload: StartCallRequest, db: Session = Depends(get_db)):
+@limiter.limit("10/minute")
+def start_call(request: Request, payload: StartCallRequest, db: Session = Depends(get_db)):
     phone_entry = (
         db.query(BusinessPhoneNumber)
         .filter(
@@ -80,7 +82,8 @@ def start_call(payload: StartCallRequest, db: Session = Depends(get_db)):
 
 
 @router.post("/api/receptionist/calls/{call_id}/turn")
-async def process_turn(call_id: str, payload: CallTurnRequest, db: Session = Depends(get_db)):
+@limiter.limit("30/minute")
+async def process_turn(request: Request, call_id: str, payload: CallTurnRequest, db: Session = Depends(get_db)):
     call = db.query(Call).filter(Call.id == call_id).first()
     if not call:
         raise HTTPException(status_code=404, detail="Call not found.")
@@ -126,7 +129,9 @@ MAX_AUDIO_BYTES = 10 * 1024 * 1024  # 10MB ceiling
 
 
 @router.post("/api/receptionist/calls/{call_id}/audio-turn")
+@limiter.limit("30/minute")
 async def process_audio_turn(
+    request: Request,
     call_id: str,
     audio: UploadFile = File(...),
     db: Session = Depends(get_db),

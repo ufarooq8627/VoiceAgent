@@ -1,6 +1,7 @@
 import logging
 from starlette.concurrency import run_in_threadpool
 from app.config import settings
+from app.limiter import limiter
 logger = logging.getLogger("app.telephony")
 """
 Telephony Webhook Routes for Twilio (TwiML) and Telnyx (TeXML).
@@ -102,7 +103,9 @@ def _generate_texml_response(reply_text: str, action_url: str, is_final: bool = 
 # ---------------------------------------------------------------------------
 
 @router.post("/twilio/voice")
+@limiter.limit("60/minute")
 async def twilio_inbound_voice(
+    request: Request,
     CallSid: str = Form(...),
     From: str = Form(default=""),
     To: str = Form(default=""),
@@ -152,7 +155,9 @@ async def twilio_inbound_voice(
 
 
 @router.post("/twilio/gather")
+@limiter.limit("60/minute")
 async def twilio_voice_gather(
+    request: Request,
     call_sid: str,
     SpeechResult: str = Form(default=""),
     Confidence: float = Form(default=0.0),
@@ -239,7 +244,9 @@ async def twilio_call_status(
 # ---------------------------------------------------------------------------
 
 @router.post("/telnyx/voice")
+@limiter.limit("60/minute")
 async def telnyx_inbound_voice(
+    request: Request,
     CallSid: str = Form(default=""),
     CallControlId: str = Form(default=""),
     From: str = Form(default=""),
@@ -287,7 +294,9 @@ async def telnyx_inbound_voice(
 
 
 @router.post("/telnyx/gather")
+@limiter.limit("60/minute")
 async def telnyx_voice_gather(
+    request: Request,
     call_sid: str,
     SpeechResult: str = Form(default=""),
     db: Session = Depends(get_db),
