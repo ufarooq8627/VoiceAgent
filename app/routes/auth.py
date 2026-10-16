@@ -1,4 +1,4 @@
-import bcrypt
+﻿import bcrypt
 from fastapi import APIRouter, Request, Form, HTTPException, Depends
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
@@ -13,6 +13,8 @@ async def login_required(request: Request):
     if not request.session.get("authenticated"):
         if request.headers.get("HX-Request") == "true":
             raise HTTPException(status_code=303, headers={"HX-Redirect": "/admin/login"})
+        if request.url.path.startswith("/api/"):
+            raise HTTPException(status_code=401, detail="Authentication required")
         raise HTTPException(status_code=303, headers={"Location": "/admin/login"})
     return request.session.get("username")
 
