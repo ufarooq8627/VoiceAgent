@@ -1,4 +1,4 @@
-import io
+﻿import io
 import pytest
 from datetime import datetime, timezone
 import openpyxl
@@ -9,6 +9,7 @@ from sqlalchemy.orm import sessionmaker
 
 from app.database import Base, get_db
 from app.models.receptionist import Business, Call, UnansweredEnquiry, KnowledgeItem
+from app.routes.auth import login_required
 from app.main import app
 
 engine = create_engine(
@@ -64,15 +65,46 @@ def client():
     app.dependency_overrides.pop(get_db, None)
 
 
-def test_list_enquiries_page(client):
-    res = client.get("/admin/receptionist/enquiries")
+@pytest.fixture
+def auth_client():
+    app.dependency_overrides[get_db] = override_get_db
+    app.dependency_overrides[login_required] = lambda: "admin"
+    yield TestClient(app)
+    app.dependency_overrides.pop(login_required, None)
+    app.dependency_overrides.pop(get_db, None)
+
+
+def test_receptionist_enquiries_unauthorized_redirects(client):
+    res = client.get("/admin/receptionist/enquiries", follow_redirects=False)
+    assert res.status_code == 303
+    assert res.headers["location"] == "/admin/login"
+
+
+def test_receptionist_export_unauthorized_redirects(client):
+    res = client.get("/admin/receptionist/export", follow_redirects=False)
+    assert res.status_code == 303
+    assert res.headers["location"] == "/admin/login"
+
+
+def test_receptionist_resolve_unauthorized_redirects(client):
+    res = client.post(
+        "/admin/receptionist/enquiries/enq-200/resolve",
+        data={"owner_answer": "Test answer"},
+        follow_redirects=False,
+    )
+    assert res.status_code == 303
+    assert res.headers["location"] == "/admin/login"
+
+
+def test_list_enquiries_page(auth_client):
+    res = auth_client.get("/admin/receptionist/enquiries")
     assert res.status_code == 200
     assert "Can I park in the underground garage?" in res.text
     assert "+15554443333" in res.text
 
 
-def test_resolve_enquiry_and_publish_kb(client):
-    res = client.post(
+def test_resolve_enquiry_and_publish_kb(auth_client):
+    res = auth_client.post(
         "/admin/receptionist/enquiries/enq-200/resolve",
         data={
             "owner_answer": "Yes, visitor parking is free on level B2.",
@@ -98,8 +130,8 @@ def test_resolve_enquiry_and_publish_kb(client):
     db.close()
 
 
-def test_export_excel_11_columns(client):
-    res = client.get("/admin/receptionist/export")
+def test_export_excel_11_columns(auth_client):
+    res = auth_client.get("/admin/receptionist/export")
     assert res.status_code == 200
     assert "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" in res.headers["content-type"]
 

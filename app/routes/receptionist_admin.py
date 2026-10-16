@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, Form, HTTPException, Request, Response
+﻿from fastapi import APIRouter, Depends, Form, HTTPException, Request, Response
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
@@ -7,8 +7,13 @@ from app.database import get_db
 from app.models.receptionist import UnansweredEnquiry, Business
 from app.services.enquiry_service import EnquiryService
 from app.services.receptionist_export import ReceptionistExportService
+from app.routes.auth import login_required
 
-router = APIRouter(prefix="/admin/receptionist", tags=["receptionist_admin"])
+router = APIRouter(
+    prefix="/admin/receptionist",
+    dependencies=[Depends(login_required)],
+    tags=["receptionist_admin"],
+)
 templates = Jinja2Templates(directory="app/templates")
 
 
