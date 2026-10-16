@@ -80,7 +80,7 @@ def start_call(payload: StartCallRequest, db: Session = Depends(get_db)):
 
 
 @router.post("/api/receptionist/calls/{call_id}/turn")
-def process_turn(call_id: str, payload: CallTurnRequest, db: Session = Depends(get_db)):
+async def process_turn(call_id: str, payload: CallTurnRequest, db: Session = Depends(get_db)):
     call = db.query(Call).filter(Call.id == call_id).first()
     if not call:
         raise HTTPException(status_code=404, detail="Call not found.")
@@ -93,7 +93,8 @@ def process_turn(call_id: str, payload: CallTurnRequest, db: Session = Depends(g
     agent = GeminiReceptionistAgent(business_name=business_name, tools=tools)
     history = list(call.transcript or [])
 
-    turn_result = agent.process_turn(
+    turn_result = await run_in_threadpool(
+        agent.process_turn,
         history=history,
         caller_message=payload.caller_message,
     )
@@ -121,6 +122,9 @@ def process_turn(call_id: str, payload: CallTurnRequest, db: Session = Depends(g
     }
 
 
+MAX_AUDIO_BYTES = 10 * 1024 * 1024  # 10MB ceiling
+
+
 @router.post("/api/receptionist/calls/{call_id}/audio-turn")
 async def process_audio_turn(
     call_id: str,
@@ -131,6 +135,10 @@ async def process_audio_turn(
     Receive audio blob from browser MediaRecorder, transcribe via Gemini multimodal,
     then process through the agent pipeline. This bypasses Chrome Speech API entirely.
     """
+    # Fast pre-check if Content-Length header or client size is provided
+    if audio.size is not None and audio.size > MAX_AUDIO_BYTES:
+        raise HTTPException(status_code=413, detail="Audio file too large. Maximum allowed size is 10MB.")
+
     call = db.query(Call).filter(Call.id == call_id).first()
     if not call:
         raise HTTPException(status_code=404, detail="Call not found.")
@@ -139,6 +147,8 @@ async def process_audio_turn(
 
     # Read audio bytes
     audio_bytes = await audio.read()
+    if len(audio_bytes) > MAX_AUDIO_BYTES:
+        raise HTTPException(status_code=413, detail="Audio file too large. Maximum allowed size is 10MB.")
     if len(audio_bytes) < 100:
         raise HTTPException(status_code=400, detail="Audio too short or empty.")
 
