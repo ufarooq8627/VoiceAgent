@@ -2,8 +2,16 @@
 from fastapi.testclient import TestClient
 from app.main import app
 from app.routes.auth import login_required
+from app.limiter import limiter
 
 client = TestClient(app)
+
+
+@pytest.fixture(autouse=True)
+def reset_rate_limits():
+    limiter.reset()
+    yield
+    limiter.reset()
 
 
 def test_login_rate_limiting_triggers_429():
