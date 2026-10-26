@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ tenant.name }} - Leads & Inquiries</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+        body { background: #0b0f19; color: #f3f4f6; min-height: 100vh; display: flex; }
+        .sidebar { width: 250px; background: #111827; border-right: 1px solid #1f2937; padding: 24px; display: flex; flex-direction: column; }
+        .brand { display: flex; align-items: center; gap: 10px; margin-bottom: 32px; font-weight: 700; color: #fff; }
+        .brand-icon { width: 32px; height: 32px; border-radius: 8px; background: linear-gradient(135deg, #6366f1 0%, #4338ca 100%); display: flex; align-items: center; justify-content: center; color: white; font-weight: 800; }
+        .nav-menu { display: flex; flex-direction: column; gap: 8px; flex-grow: 1; }
+        .nav-item { display: flex; align-items: center; gap: 12px; padding: 10px 14px; border-radius: 10px; color: #9ca3af; text-decoration: none; font-size: 14px; font-weight: 500; }
+        .nav-item:hover, .nav-item.active { color: #ffffff; background: rgba(99, 102, 241, 0.15); }
+        .nav-item.logout { margin-top: auto; color: #f87171; }
+        .main-content { flex-grow: 1; padding: 36px 48px; overflow-y: auto; }
+        .top-bar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 28px; }
+        h1 { font-size: 26px; font-weight: 800; }
+        .card { background: #111827; border: 1px solid #1f2937; border-radius: 16px; padding: 24px; margin-bottom: 24px; }
+        .card-title { font-size: 16px; font-weight: 700; margin-bottom: 16px; }
+        table { width: 100%; border-collapse: collapse; font-size: 14px; }
+        th { text-align: left; padding: 12px 14px; color: #9ca3af; border-bottom: 1px solid #1f2937; font-weight: 600; font-size: 12px; text-transform: uppercase; }
+        td { padding: 14px; border-bottom: 1px solid #1a2234; color: #e5e7eb; }
+        .status-badge { padding: 3px 10px; border-radius: 12px; font-size: 12px; font-weight: 600; }
+        .status-badge.pending { background: rgba(245, 158, 11, 0.15); color: #fbbf24; }
+        .status-badge.contacted { background: rgba(16, 185, 129, 0.15); color: #34d399; }
+        .btn-toggle { background: #1e293b; border: 1px solid #334155; color: #e2e8f0; padding: 4px 10px; border-radius: 6px; font-size: 12px; cursor: pointer; }
+    </style>
+</head>
+<body>
+    <aside class="sidebar">
+        <div class="brand">
+            <div class="brand-icon">D</div>
+            <span>{{ tenant.name }}</span>
+        </div>
+        <nav class="nav-menu">
+            <a href="/portal" class="nav-item">📊 Overview</a>
+            <a href="/portal/knowledge" class="nav-item">📚 Knowledge Base</a>
+            <a href="/portal/calls" class="nav-item">📞 Call Transcripts</a>
+            <a href="/portal/leads" class="nav-item active">🎯 Leads & Callbacks</a>
+            <a href="/portal/logout" class="nav-item logout">🚪 Logout</a>
+        </nav>
+    </aside>
+
+    <main class="main-content">
+        <div class="top-bar">
+            <h1>Customer Leads & Inquiries</h1>
+            <span style="font-size: 13px; color: #9ca3af;">{{ callbacks | length }} callbacks pending/contacted</span>
+        </div>
+
+        <div class="card">
+            <div class="card-title">Callback Requests (Direct Leads)</div>
+            {% if callbacks %}
+            <table>
+                <thead>
+                    <tr>
+                        <th>Customer Name</th>
+                        <th>Phone Number</th>
+                        <th>Requested At</th>
+                        <th>Status</th>
+                        <th>Action</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for cb in callbacks %}
+                    <tr>
+                        <td style="font-weight:600;">{{ cb.customer_name or 'Website Visitor' }}</td>
+                        <td style="font-family:monospace; color:#38bdf8;">{{ cb.callback_number }}</td>
+                        <td>{{ cb.created_at.strftime('%Y-%m-%d %H:%M') if cb.created_at else 'Recent' }}</td>
+                        <td><span class="status-badge {{ cb.status }}">{{ cb.status | capitalize }}</span></td>
+                        <td>
+                            <form action="/portal/leads/callback/{{ cb.id }}/status" method="POST" style="display:inline;">
+                                <input type="hidden" name="status" value="{{ 'pending' if cb.status == 'contacted' else 'contacted' }}">
+                                <button type="submit" class="btn-toggle">Mark as {{ 'Pending' if cb.status == 'contacted' else 'Contacted' }}</button>
+                            </form>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            {% else %}
+            <p style="font-size: 14px; color: #9ca3af;">No callbacks requested yet.</p>
+            {% endif %}
+        </div>
+
+        <div class="card">
+            <div class="card-title">Unanswered Inquiries (Knowledge Base Gaps)</div>
+            {% if unanswered %}
+            <table>
+                <thead>
+                    <tr>
+                        <th>Visitor Question</th>
+                        <th>Reason</th>
+                        <th>Asked At</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for u in unanswered %}
+                    <tr>
+                        <td style="color:#f3f4f6; font-weight:500;">{{ u.question }}</td>
+                        <td><span style="font-size:12px; color:#f87171;">{{ u.failure_reason }}</span></td>
+                        <td>{{ u.created_at.strftime('%Y-%m-%d %H:%M') if u.created_at else 'Recent' }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            {% else %}
+            <p style="font-size: 14px; color: #9ca3af;">Zero missed queries! The AI is answering all customer inquiries successfully.</p>
+            {% endif %}
+        </div>
+    </main>
+</body>
+</html>

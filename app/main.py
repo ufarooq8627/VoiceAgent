@@ -10,7 +10,7 @@ from slowapi.errors import RateLimitExceeded
 
 from app.config import settings
 from app.database import Base, engine
-from app.routes import auth, admin, public, api, receptionist_api, receptionist_admin, telephony_api, widget_api, client_api, portal_auth, portal_knowledge
+from app.routes import auth, admin, public, api, receptionist_api, receptionist_admin, telephony_api, widget_api, client_api, portal_auth, portal_knowledge, portal_leads
 from app.agent.worker import start_scheduler, stop_scheduler
 from app.limiter import limiter
 
@@ -70,6 +70,7 @@ app.include_router(widget_api.router)
 app.include_router(client_api.router)
 app.include_router(portal_auth.router)
 app.include_router(portal_knowledge.router)
+app.include_router(portal_leads.router)
 
 
 @app.get("/health")
