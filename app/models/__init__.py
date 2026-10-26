@@ -8,6 +8,7 @@ from app.models.email_outbox import EmailOutbox
 from app.models.inbound_message import InboundMessage
 from app.models.conversation_message import ConversationMessage
 from app.models.candidate_event import CandidateEvent
+from app.models.client_api_key import ClientApiKey
 
 __all__ = [
     "Job",
@@ -20,6 +21,7 @@ __all__ = [
     "InboundMessage",
     "ConversationMessage",
     "CandidateEvent",
+    "ClientApiKey",
 ]
 
 from app.models.receptionist import (

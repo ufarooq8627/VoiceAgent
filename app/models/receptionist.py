@@ -23,6 +23,7 @@ class Business(Base):
     unanswered_enquiries = relationship("UnansweredEnquiry", back_populates="business", cascade="all, delete-orphan")
     callback_requests = relationship("CallbackRequest", back_populates="business", cascade="all, delete-orphan")
     owner_notifications = relationship("OwnerNotification", back_populates="business", cascade="all, delete-orphan")
+    api_keys = relationship("ClientApiKey", back_populates="business", cascade="all, delete-orphan")
 
 
 class BusinessPhoneNumber(Base):
