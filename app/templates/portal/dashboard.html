@@ -1,0 +1,12 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>{{ tenant.name }} - Client Portal</title>
+</head>
+<body>
+    <h1>Welcome, {{ tenant.name }}</h1>
+    <div id="embed-snippet">&lt;script src="/static/widget/voice-widget.js" data-client-key="{{ public_key }}"&gt;&lt;/script&gt;</div>
+    <div id="kpi-calls">Total Calls: {{ total_calls }}</div>
+</body>
+</html>
