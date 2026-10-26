@@ -29,6 +29,11 @@ class ClientApiKey(Base):
     name: Mapped[str] = mapped_column(String(100), default="Default Web Key")
     allowed_origins: Mapped[list] = mapped_column(JSON, default=list, nullable=False)
     rate_limit_per_minute: Mapped[int] = mapped_column(Integer, default=60, nullable=False)
+    brand_color: Mapped[str] = mapped_column(String(20), default="#6366f1", nullable=False)
+    custom_greeting: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    widget_position: Mapped[str] = mapped_column(String(20), default="bottom-right", nullable=False)
+    webhook_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    webhook_secret: Mapped[str | None] = mapped_column(String(100), nullable=True)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
 

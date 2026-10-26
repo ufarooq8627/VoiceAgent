@@ -170,3 +170,28 @@ def end_widget_call(
         call.ended_at = datetime.now(timezone.utc)
         db.commit()
     return {"status": "ended"}
+
+@router.get("/config")
+def get_widget_config(
+    client_key: str,
+    db: Session = Depends(get_db)
+):
+    key_entry = db.query(ClientApiKey).filter(
+        ClientApiKey.public_key == client_key,
+        ClientApiKey.is_active == True
+    ).first()
+    if not key_entry:
+        raise HTTPException(status_code=404, detail="Invalid client key")
+
+    biz = db.query(Business).filter(Business.id == key_entry.business_id).first()
+    if not biz:
+        raise HTTPException(status_code=404, detail="Business not found")
+
+    default_greeting = f"Hello! Welcome to {biz.name}. How can I assist you today?"
+    return {
+        "business_name": biz.name,
+        "brand_color": key_entry.brand_color or "#6366f1",
+        "greeting": key_entry.custom_greeting or default_greeting,
+        "position": key_entry.widget_position or "bottom-right",
+        "theme": "dark"
+    }
