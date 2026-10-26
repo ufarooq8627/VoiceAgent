@@ -163,3 +163,45 @@ async def public_none_work(
         name="public/declined.html",
         context={"candidate": candidate, "message": "We have notified the recruiting team. They will reach out to schedule an alternative time."},
     )
+
+from app.models.receptionist import Business, KnowledgeItem
+from app.models.client_api_key import ClientApiKey, generate_client_keys
+
+@router.get("/demo/embed", response_class=HTMLResponse)
+def demo_embed_page(request: Request, db: Session = Depends(get_db)):
+    biz = db.query(Business).filter(Business.name == "Apex Luxury Dental Clinic").first()
+    if not biz:
+        biz = Business(name="Apex Luxury Dental Clinic", timezone="America/New_York")
+        db.add(biz)
+        db.flush()
+        pub, sec, sec_hash = generate_client_keys()
+        key = ClientApiKey(business_id=biz.id, public_key=pub, secret_key_hash=sec_hash, allowed_origins=["*"])
+        faq1 = KnowledgeItem(
+            business_id=biz.id,
+            question="What are your opening hours?",
+            answer="We are open Monday to Friday from 8:00 AM to 6:00 PM.",
+            category="hours",
+            status="approved"
+        )
+        faq2 = KnowledgeItem(
+            business_id=biz.id,
+            question="Where are you located?",
+            answer="We are located at 500 5th Avenue, Suite 1400, New York, NY.",
+            category="location",
+            status="approved"
+        )
+        db.add_all([key, faq1, faq2])
+        db.commit()
+    else:
+        key = db.query(ClientApiKey).filter(ClientApiKey.business_id == biz.id, ClientApiKey.is_active == True).first()
+        if not key:
+            pub, sec, sec_hash = generate_client_keys()
+            key = ClientApiKey(business_id=biz.id, public_key=pub, secret_key_hash=sec_hash, allowed_origins=["*"])
+            db.add(key)
+            db.commit()
+
+    return templates.TemplateResponse(
+        request=request,
+        name="demo/client_store_demo.html",
+        context={"business": biz, "client_key": key.public_key}
+    )
