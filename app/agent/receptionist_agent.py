@@ -80,12 +80,7 @@ class GeminiReceptionistAgent:
             context_snippets = [f"- {r['question']}: {r['answer']}" for r in faq_res["results"]]
             context_text = "\n".join(context_snippets)
         else:
-            # Fallback to general business profile
-            context_text = (
-                f"- Business: {self.business_name}\n"
-                f"- General services: Dental checkups, root canals, crowns, gentle extractions, cleanings.\n"
-                f"- General Hours: Mon-Fri 8:30 AM - 6:00 PM, Sat 9:00 AM - 2:00 PM."
-            )
+            context_text = f"No specific verified business knowledge found for this query regarding {self.business_name}." 
 
         # 4. Generate Grounded Response via Gemini
         try:
