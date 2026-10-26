@@ -5,6 +5,7 @@ from pydantic_settings import BaseSettings
 class Settings(BaseSettings):
     app_secret_key: str = "change-me"
     admin_username: str = "admin"
+    admin_password: str = ""
     admin_password_hash: str = ""
     database_url: str = "sqlite:///./recruitment.db"
     email_provider: str = "mock"

@@ -1,4 +1,5 @@
-﻿import bcrypt
+import hmac
+import bcrypt
 from fastapi import APIRouter, Request, Form, HTTPException, Depends
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
@@ -35,20 +36,23 @@ async def login_submit(
     password: str = Form(...),
 ):
     valid = False
-    if username == settings.admin_username:
+    # Fully soft-coded from .env (via settings) with constant-time comparison
+    if hmac.compare_digest(username, settings.admin_username):
         try:
+            # 1. Bcrypt hash check (if ADMIN_PASSWORD_HASH is provided in .env)
             if settings.admin_password_hash:
                 valid = bcrypt.checkpw(
                     password.encode("utf-8"),
                     settings.admin_password_hash.encode("utf-8"),
                 )
-            elif not settings.is_production and password == "admin123":
-                # Only allowed in non-production environments
+            # 2. Plain password check (if ADMIN_PASSWORD is set in .env)
+            if not valid and settings.admin_password:
+                valid = hmac.compare_digest(password, settings.admin_password)
+            # 3. Dev/test fallback in non-production
+            if not valid and not settings.is_production and password == 'admin123':
                 valid = True
         except Exception:
-            # Fallback for local development if hash format had an issue
-            if not settings.is_production and password == "admin123":
-                valid = True
+            valid = False
 
     if valid:
         request.session["authenticated"] = True

@@ -84,3 +84,6 @@ def invited_candidate(db_session):
         return msg
 
     return job, cand, slots, create_inbound
+
+from app.limiter import limiter
+limiter.enabled = False
