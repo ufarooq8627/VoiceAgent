@@ -108,12 +108,15 @@ async def process_turn(request: Request, call_id: str, payload: CallTurnRequest,
         "content": payload.caller_message,
         "timestamp": datetime.now(timezone.utc).isoformat(),
     })
-    new_transcript.append({
+    agent_entry = {
         "role": "agent",
         "content": turn_result.spoken_response,
         "timestamp": datetime.now(timezone.utc).isoformat(),
         "tools_called": turn_result.tools_invoked,
-    })
+    }
+    if turn_result.meta:
+        agent_entry["meta"] = turn_result.meta
+    new_transcript.append(agent_entry)
     call.transcript = new_transcript
     db.commit()
 
@@ -122,6 +125,7 @@ async def process_turn(request: Request, call_id: str, payload: CallTurnRequest,
         "reply_text": turn_result.spoken_response,
         "tools_called": turn_result.tools_invoked,
         "actions_taken": turn_result.actions_taken,
+        "meta": turn_result.meta,
     }
 
 
@@ -190,12 +194,15 @@ async def process_audio_turn(
         "timestamp": datetime.now(timezone.utc).isoformat(),
         "source": "voice_mic",
     })
-    new_transcript.append({
+    agent_entry = {
         "role": "agent",
         "content": turn_result.spoken_response,
         "timestamp": datetime.now(timezone.utc).isoformat(),
         "tools_called": turn_result.tools_invoked,
-    })
+    }
+    if turn_result.meta:
+        agent_entry["meta"] = turn_result.meta
+    new_transcript.append(agent_entry)
     call.transcript = new_transcript
     db.commit()
 
@@ -205,6 +212,7 @@ async def process_audio_turn(
         "reply_text": turn_result.spoken_response,
         "tools_called": turn_result.tools_invoked,
         "actions_taken": turn_result.actions_taken,
+        "meta": turn_result.meta,
     }
 
 

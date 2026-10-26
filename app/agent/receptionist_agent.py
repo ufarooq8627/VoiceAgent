@@ -29,9 +29,43 @@ class AgentTurnResult:
     spoken_response: str
     tools_invoked: list[str] = field(default_factory=list)
     actions_taken: list[dict] = field(default_factory=list)
+    meta: dict = field(default_factory=dict)
 
 
 class GeminiReceptionistAgent:
+    STRICT_AFFIRMATIVE = {
+        "yes", "yeah", "yes please", "correct", "that's right",
+        "yes that's correct", "yes, that is correct", "yep", "sure", "please do"
+    }
+
+    @staticmethod
+    def _format_digits(phone: str) -> str:
+        digits = [c for c in str(phone) if c.isdigit()]
+        return "-".join(digits)
+
+    @staticmethod
+    def _extract_phone_number(text: str) -> str | None:
+        match = re.search(r"(\+?\d[\d\s\-().]{6,15}\d)", text)
+        if match:
+            raw = match.group(1)
+            digits = "".join(c for c in raw if c.isdigit())
+            if 7 <= len(digits) <= 15:
+                return ("+" if raw.startswith("+") else "") + digits
+        return None
+
+    def _get_pending_callback(self, history: list[dict]) -> dict | None:
+        for entry in reversed(history):
+            if entry.get("role") in ("agent", "assistant"):
+                meta = entry.get("meta") or {}
+                if "pending_callback" in meta:
+                    return meta["pending_callback"]
+                content = entry.get("content", "")
+                m = re.search(r"I have your number as ([0-9\- ]+)\. Is that correct", content, re.IGNORECASE)
+                if m:
+                    digits = "".join(c for c in m.group(1) if c.isdigit())
+                    return {"number": digits}
+                break
+        return None
 
     def __init__(self, business_name: str, tools: ReceptionistTools, caller_number: str | None = None):
         self.business_name = business_name
@@ -66,30 +100,82 @@ class GeminiReceptionistAgent:
                 actions_taken=[]
             )
 
-        # 2. Check for callback confirmation flow
-        affirmative = ["yes that's correct", "yes, that is correct", "correct", "that's right", "please do", "yes call me", "call me back", "call me", "yes please", "yes", "sure", "please"]
-        if any(w in msg_lower for w in affirmative):
-            last_agent = next((h["content"] for h in reversed(history) if h.get("role") in ["agent", "assistant"]), "")
-            if "callback" in last_agent.lower() or "team" in last_agent.lower():
-                resolved_phone = self.caller_number or self.tools.get_caller_number()
-                if not resolved_phone or str(resolved_phone).strip().lower() in ("", "none", "unknown", "anonymous"):
-                    return AgentTurnResult(
-                        spoken_response="I would be happy to schedule a callback for you. Could you please provide your best contact phone number so our team can reach you?",
-                        tools_invoked=[],
-                        actions_taken=[]
-                    )
+        # 2. Two-Step Callback Consent Flow
+        clean_reply = re.sub(r"[^\w\s]", "", msg_lower).strip()
+        pending = self._get_pending_callback(history)
+
+        # 2a. Caller is responding to a digit-by-digit read-back
+        if pending and pending.get("number"):
+            pending_number = str(pending["number"]).strip()
+            if clean_reply in self.STRICT_AFFIRMATIVE:
+                # Explicit consent confirmed!
                 res = self.tools.schedule_callback(
                     customer_name="Caller",
-                    phone_number=str(resolved_phone).strip(),
+                    phone_number=pending_number,
                     confirmed_by_caller=True
                 )
                 tools_invoked.append("schedule_callback")
                 actions_taken.append(res)
                 return AgentTurnResult(
-                    spoken_response=f"Thank you! I have confirmed your callback request at {str(resolved_phone).strip()}. Our team will contact you shortly.",
+                    spoken_response=f"Thank you! I have confirmed your callback request at {pending_number}. Our team will contact you shortly.",
                     tools_invoked=tools_invoked,
-                    actions_taken=actions_taken
+                    actions_taken=actions_taken,
+                    meta={}
                 )
+            # If caller said anything else, clear pending state and handle as normal enquiry below
+
+        # 2b. Caller is responding to prompt for phone number
+        elif pending and pending.get("state") == "awaiting_number":
+            extracted_num = self._extract_phone_number(msg_clean)
+            if extracted_num:
+                formatted = self._format_digits(extracted_num)
+                return AgentTurnResult(
+                    spoken_response=f"I have your number as {formatted}. Is that correct? Please say yes or no.",
+                    tools_invoked=[],
+                    actions_taken=[],
+                    meta={"pending_callback": {"number": extracted_num}}
+                )
+            elif clean_reply in self.STRICT_AFFIRMATIVE:
+                return AgentTurnResult(
+                    spoken_response="Could you please provide your phone number so our team can reach you?",
+                    tools_invoked=[],
+                    actions_taken=[],
+                    meta={"pending_callback": {"number": None, "state": "awaiting_number"}}
+                )
+
+        # 2c. Caller explicitly requests a callback or confirms a general callback offer
+        callback_keywords = ["call me back", "call me", "give me a call", "schedule a callback", "book a callback", "want a callback", "request a callback"]
+        caller_requested_callback = any(kw in msg_lower for kw in callback_keywords)
+
+        last_agent_content = ""
+        for h in reversed(history):
+            if h.get("role") in ("agent", "assistant"):
+                last_agent_content = h.get("content", "").lower()
+                break
+
+        agent_offered_callback = (
+            ("would you like" in last_agent_content or "can give you a callback" in last_agent_content or "team to give you a callback" in last_agent_content or "offer a callback" in last_agent_content)
+            and ("thank you! i have confirmed" not in last_agent_content)
+        )
+        confirmed_general_offer = agent_offered_callback and (clean_reply in self.STRICT_AFFIRMATIVE)
+
+        if caller_requested_callback or confirmed_general_offer:
+            resolved_phone = self.caller_number or self.tools.get_caller_number()
+            if not resolved_phone or str(resolved_phone).strip().lower() in ("", "none", "unknown", "anonymous"):
+                return AgentTurnResult(
+                    spoken_response="I would be happy to schedule a callback for you. Could you please provide your best contact phone number so our team can reach you?",
+                    tools_invoked=[],
+                    actions_taken=[],
+                    meta={"pending_callback": {"number": None, "state": "awaiting_number"}}
+                )
+            clean_p = str(resolved_phone).strip()
+            formatted = self._format_digits(clean_p)
+            return AgentTurnResult(
+                spoken_response=f"I have your number as {formatted}. Is that correct? Please say yes or no.",
+                tools_invoked=[],
+                actions_taken=[],
+                meta={"pending_callback": {"number": clean_p}}
+            )
 
         # 3. Retrieve relevant business knowledge via RAG
         faq_res = self.tools.search_faq(msg_clean)

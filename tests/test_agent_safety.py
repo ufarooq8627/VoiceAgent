@@ -48,9 +48,17 @@ def test_callback_uses_dynamic_caller_phone():
     agent = GeminiReceptionistAgent(business_name="Apex Legal", tools=tools, caller_number="+19994443333")
 
     history = [{"role": "agent", "content": "Would you like our team to give you a callback?"}]
+    # Turn 1: Caller expresses interest -> Agent reads back number digit-by-digit
     result = agent.process_turn(history=history, caller_message="Yes, please call me back")
+    assert "1-9-9-9-4-4-4-3-3-3-3" in result.spoken_response
+    assert result.meta.get("pending_callback", {}).get("number") == "+19994443333"
 
-    assert "schedule_callback" in result.tools_invoked
+    # Turn 2: Caller explicitly confirms read-back -> Callback scheduled
+    history.append({"role": "caller", "content": "Yes, please call me back"})
+    history.append({"role": "agent", "content": result.spoken_response, "meta": result.meta})
+    result2 = agent.process_turn(history=history, caller_message="Yes")
+
+    assert "schedule_callback" in result2.tools_invoked
     cb = db.query(CallbackRequest).filter(CallbackRequest.call_id == "call-real").first()
     assert cb is not None
     assert cb.callback_number == "+19994443333", f"Expected +19994443333, got {cb.callback_number}"
