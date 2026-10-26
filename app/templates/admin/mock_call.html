@@ -249,6 +249,8 @@ let currentMicDeviceId = '';
 let maxRecordedVolume = 0;
 let isTestingMic = false;
 let testMicTimeout = null;
+let currentTurnController = null;
+let currentTurnId = 0;
 
 function toggleAudio() {
     audioEnabled = !audioEnabled;
@@ -531,6 +533,13 @@ async function handleSendTurn(e) {
     showMicNotice("");
     appendMessage("caller", msg);
 
+    // Turn gating: abort previous inflight turn
+    if (currentTurnController) {
+        currentTurnController.abort();
+    }
+    currentTurnController = new AbortController();
+    const thisTurnId = ++currentTurnId;
+
     // Show processing indicator
     const processingId = appendProcessing("Agent is thinking...");
 
@@ -538,11 +547,19 @@ async function handleSendTurn(e) {
         const res = await fetch('/api/receptionist/calls/' + currentCallId + '/turn', {
             method: "POST",
             headers: {"Content-Type": "application/json"},
-            body: JSON.stringify({ caller_message: msg })
+            body: JSON.stringify({ caller_message: msg }),
+            signal: currentTurnController.signal
         });
         removeProcessing(processingId);
+
+        // Turn gating: discard if a newer turn was started
+        if (thisTurnId !== currentTurnId) {
+            console.log(`[Turn Gating] Discarding stale text turn ${thisTurnId} (latest is ${currentTurnId})`);
+            return;
+        }
+
         if (!res.ok) {
-            const err = await res.json();
+            const err = await res.json().catch(() => ({}));
             appendMessage("agent", "Error: " + (err.detail || "Failed to process"));
             return;
         }
@@ -551,6 +568,10 @@ async function handleSendTurn(e) {
         speakText(data.reply_text);
     } catch (err) {
         removeProcessing(processingId);
+        if (err.name === 'AbortError') {
+            console.log(`[Turn Gating] Text turn ${thisTurnId} aborted.`);
+            return;
+        }
         appendMessage("agent", "Communication error: " + err.message);
     }
 }
@@ -597,7 +618,19 @@ function removeProcessing(id) {
 async function endCall() {
     if (!currentCallId) return;
     try {
+        if (currentTurnController) {
+            currentTurnController.abort();
+            currentTurnController = null;
+        }
         stopRecording();
+        if (micStream) {
+            micStream.getTracks().forEach(t => t.stop());
+            micStream = null;
+        }
+        if (audioCtx && audioCtx.state !== 'closed') {
+            try { audioCtx.close(); } catch(e){}
+            audioCtx = null;
+        }
         if ('speechSynthesis' in window) window.speechSynthesis.cancel();
 
         const res = await fetch('/api/receptionist/calls/' + currentCallId + '/end', {
@@ -605,7 +638,7 @@ async function endCall() {
             headers: {"Content-Type": "application/json"},
             body: JSON.stringify({ summary: "Call finished via simulator." })
         });
-        const data = await res.json();
+        const data = await res.json().catch(() => ({}));
 
         clearInterval(callTimerInterval);
         if (animFrameId) cancelAnimationFrame(animFrameId);
@@ -620,12 +653,22 @@ async function endCall() {
         document.getElementById("audio-visualizer").style.display = "none";
         document.getElementById("waveform-panel").style.display = "none";
 
-        appendMessage("agent", "&#128222; Call disconnected. Status: " + data.status + ". Summary: " + data.summary);
+        appendMessage("agent", "&#128222; Call disconnected. Status: " + (data.status || "completed") + ". Summary: " + (data.summary || "Call ended."));
         currentCallId = null;
     } catch (e) {
-        alert("Error ending call: " + e.message);
+        console.error("Error ending call: " + e.message);
     }
 }
+
+window.addEventListener('beforeunload', () => {
+    if (micStream) {
+        micStream.getTracks().forEach(t => t.stop());
+        micStream = null;
+    }
+    if (currentCallId) {
+        navigator.sendBeacon('/api/receptionist/calls/' + currentCallId + '/end', JSON.stringify({ summary: "Tab closed." }));
+    }
+});
 
 // ─────────────────────────────────────────────────────
 // MediaRecorder-based Mic (Server-side Gemini STT)
@@ -699,6 +742,13 @@ async function toggleVoiceInput() {
             showMicNotice("Sending audio to Gemini for transcription...");
             const processingId = appendProcessing("Transcribing your voice with Gemini AI...");
 
+            // Turn gating: abort previous inflight turn
+            if (currentTurnController) {
+                currentTurnController.abort();
+            }
+            currentTurnController = new AbortController();
+            const thisTurnId = ++currentTurnId;
+
             // Send audio to server for Gemini transcription
             const formData = new FormData();
             formData.append('audio', audioBlob, 'recording.' + (mimeType.includes('webm') ? 'webm' : mimeType.includes('ogg') ? 'ogg' : 'mp4'));
@@ -707,12 +757,20 @@ async function toggleVoiceInput() {
                 const res = await fetch('/api/receptionist/calls/' + currentCallId + '/audio-turn', {
                     method: 'POST',
                     body: formData,
+                    signal: currentTurnController.signal
                 });
                 removeProcessing(processingId);
                 showMicNotice("");
 
+                // Turn gating: discard if a newer turn was started
+                if (thisTurnId !== currentTurnId) {
+                    console.log(`[Turn Gating] Discarding stale audio turn ${thisTurnId} (latest is ${currentTurnId})`);
+                    setVoiceStatus("Ready for your turn", "#94a3b8", false);
+                    return;
+                }
+
                 if (!res.ok) {
-                    const err = await res.json();
+                    const err = await res.json().catch(() => ({}));
                     showMicNotice("Transcription error: " + (err.detail || "Failed"), true);
                     setVoiceStatus("Ready for your turn", "#94a3b8", false);
                     return;
@@ -721,8 +779,12 @@ async function toggleVoiceInput() {
 
                 if (data.transcription) {
                     appendMessage("caller", data.transcription + ' <span style="font-size:0.7rem; opacity:0.6;">(voice)</span>');
-                } else {
+                } else if (data.silence_detected) {
                     appendMessage("caller", '<em style="opacity:0.5;">(no speech detected)</em>');
+                }
+
+                if (data.error_detected) {
+                    showMicNotice("?? " + data.reply_text, true);
                 }
 
                 appendMessage("agent", data.reply_text, data.tools_called);
@@ -730,6 +792,11 @@ async function toggleVoiceInput() {
                 setVoiceStatus("Ready for your turn", "#94a3b8", false);
             } catch (err) {
                 removeProcessing(processingId);
+                if (err.name === 'AbortError') {
+                    console.log(`[Turn Gating] Audio turn ${thisTurnId} aborted.`);
+                    setVoiceStatus("Ready for your turn", "#94a3b8", false);
+                    return;
+                }
                 showMicNotice("Network error sending audio: " + err.message, true);
                 setVoiceStatus("Ready for your turn", "#94a3b8", false);
             }
