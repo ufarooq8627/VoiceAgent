@@ -35,3 +35,12 @@ function toggleAllCheckboxes(masterCheckbox, targetSelector) {
         cb.checked = masterCheckbox.checked;
     });
 }
+
+// Intercept under-progress features
+function handleUnderProgress(event, featureName) {
+    if (event) {
+        event.preventDefault();
+        event.stopPropagation();
+    }
+    showToast("?? " + featureName + " is not ready ? this function is currently under progress.", "error");
+}

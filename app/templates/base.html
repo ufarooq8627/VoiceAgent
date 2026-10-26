@@ -27,25 +27,28 @@
             </div>
 
             <nav class="sidebar-nav">
-                <a href="/admin/" class="nav-link {% if active_nav == 'jobs' %}active{% endif %}">
-                    <span class="nav-icon">💼</span>
+                <a href="/admin/" class="nav-link {% if active_nav == 'jobs' %}active{% endif %}" onclick="handleUnderProgress(event, 'Jobs & Candidates')">
+                    <span class="nav-icon">??</span>
                     <span>Jobs & Candidates</span>
+                    <span class="badge-progress" style="margin-left: auto; font-size: 0.65rem; background: rgba(245, 158, 11, 0.15); color: #f59e0b; border: 1px solid rgba(245, 158, 11, 0.3); border-radius: 4px; padding: 2px 6px; font-weight: 500;">Soon</span>
                 </a>
-                <a href="/admin/interviewers" class="nav-link {% if active_nav == 'interviewers' %}active{% endif %}">
-                    <span class="nav-icon">👥</span>
+                <a href="/admin/interviewers" class="nav-link {% if active_nav == 'interviewers' %}active{% endif %}" onclick="handleUnderProgress(event, 'Interviewers')">
+                    <span class="nav-icon">??</span>
                     <span>Interviewers</span>
+                    <span class="badge-progress" style="margin-left: auto; font-size: 0.65rem; background: rgba(245, 158, 11, 0.15); color: #f59e0b; border: 1px solid rgba(245, 158, 11, 0.3); border-radius: 4px; padding: 2px 6px; font-weight: 500;">Soon</span>
                 </a>
-                <a href="/admin/mock-inbox" class="nav-link {% if active_nav == 'inbox' %}active{% endif %}">
-                    <span class="nav-icon">📥</span>
+                <a href="/admin/mock-inbox" class="nav-link {% if active_nav == 'inbox' %}active{% endif %}" onclick="handleUnderProgress(event, 'Mock Inbox')">
+                    <span class="nav-icon">??</span>
                     <span>Mock Inbox</span>
+                    <span class="badge-progress" style="margin-left: auto; font-size: 0.65rem; background: rgba(245, 158, 11, 0.15); color: #f59e0b; border: 1px solid rgba(245, 158, 11, 0.3); border-radius: 4px; padding: 2px 6px; font-weight: 500;">Soon</span>
                 </a>
                 <div style="margin: 12px 16px 6px; font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.05em; color: #64748b; font-weight: 600;">Voice Receptionist</div>
                 <a href="/admin/mock-call" class="nav-link {% if active_nav == 'mock-call' %}active{% endif %}">
-                    <span class="nav-icon">🎙️</span>
+                    <span class="nav-icon">???</span>
                     <span>Voice Simulator</span>
                 </a>
                 <a href="/admin/receptionist/enquiries" class="nav-link {% if active_nav == 'receptionist_enquiries' %}active{% endif %}">
-                    <span class="nav-icon">❓</span>
+                    <span class="nav-icon">?</span>
                     <span>Customer Enquiries</span>
                 </a>
             </nav>
@@ -79,5 +82,18 @@
 
     <script src="/static/js/app.js"></script>
     {% block scripts %}{% endblock %}
+    <script>
+    function handleUnderProgress(event, featureName) {
+        if (event) {
+            event.preventDefault();
+            event.stopPropagation();
+        }
+        if (typeof showToast === "function") {
+            showToast("?? " + featureName + " is not ready ? this function is currently under progress.", "error");
+        } else {
+            alert("?? " + featureName + " is not ready ? this function is currently under progress.");
+        }
+    }
+    </script>
 </body>
 </html>
