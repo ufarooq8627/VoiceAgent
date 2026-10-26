@@ -96,3 +96,17 @@ def portal_home(
             "total_faqs": total_faqs
         }
     )
+
+@router.post("/settings/origins")
+def update_allowed_origins(
+    request: Request,
+    allowed_origins: str = Form(...),
+    tenant: Business = Depends(get_current_tenant),
+    db: Session = Depends(get_db)
+):
+    key = db.query(ClientApiKey).filter(ClientApiKey.business_id == tenant.id, ClientApiKey.is_active == True).first()
+    if key:
+        origins_list = [o.strip() for o in allowed_origins.split(",") if o.strip()]
+        key.allowed_origins = origins_list
+        db.commit()
+    return RedirectResponse(url="/portal", status_code=303)
