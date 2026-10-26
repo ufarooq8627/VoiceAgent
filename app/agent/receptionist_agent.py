@@ -21,9 +21,10 @@ class AgentTurnResult:
 
 class GeminiReceptionistAgent:
 
-    def __init__(self, business_name: str, tools: ReceptionistTools):
+    def __init__(self, business_name: str, tools: ReceptionistTools, caller_number: str | None = None):
         self.business_name = business_name
         self.tools = tools
+        self.caller_number = caller_number
 
     def get_opening_greeting(self) -> str:
         return f"Hello, thank you for calling {self.business_name}. I am an AI voice receptionist. How may I help you today?"
@@ -54,18 +55,26 @@ class GeminiReceptionistAgent:
             )
 
         # 2. Check for callback confirmation flow
-        if any(w in msg_lower for w in ["yes that's correct", "yes, that is correct", "correct", "that's right", "please do", "yes call me"]):
+        affirmative = ["yes that's correct", "yes, that is correct", "correct", "that's right", "please do", "yes call me", "call me back", "call me", "yes please", "yes", "sure", "please"]
+        if any(w in msg_lower for w in affirmative):
             last_agent = next((h["content"] for h in reversed(history) if h.get("role") in ["agent", "assistant"]), "")
             if "callback" in last_agent.lower() or "team" in last_agent.lower():
+                resolved_phone = self.caller_number or self.tools.get_caller_number()
+                if not resolved_phone or str(resolved_phone).strip().lower() in ("", "none", "unknown", "anonymous"):
+                    return AgentTurnResult(
+                        spoken_response="I would be happy to schedule a callback for you. Could you please provide your best contact phone number so our team can reach you?",
+                        tools_invoked=[],
+                        actions_taken=[]
+                    )
                 res = self.tools.schedule_callback(
                     customer_name="Caller",
-                    phone_number="+15550001111",
+                    phone_number=str(resolved_phone).strip(),
                     confirmed_by_caller=True
                 )
                 tools_invoked.append("schedule_callback")
                 actions_taken.append(res)
                 return AgentTurnResult(
-                    spoken_response="Thank you! I have confirmed your callback request. Our team will contact you shortly.",
+                    spoken_response=f"Thank you! I have confirmed your callback request at {str(resolved_phone).strip()}. Our team will contact you shortly.",
                     tools_invoked=tools_invoked,
                     actions_taken=actions_taken
                 )

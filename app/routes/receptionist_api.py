@@ -92,8 +92,8 @@ async def process_turn(request: Request, call_id: str, payload: CallTurnRequest,
 
     business = db.query(Business).filter(Business.id == call.business_id).first()
     business_name = business.name if business else "Our Business"
-    tools = ReceptionistTools(db=db, business_id=call.business_id, call_id=call.id)
-    agent = GeminiReceptionistAgent(business_name=business_name, tools=tools)
+    tools = ReceptionistTools(db=db, business_id=call.business_id, call_id=call.id, caller_number=call.caller_number)
+    agent = GeminiReceptionistAgent(business_name=business_name, tools=tools, caller_number=call.caller_number)
     history = list(call.transcript or [])
 
     turn_result = await run_in_threadpool(
@@ -172,8 +172,8 @@ async def process_audio_turn(
     # Now process the transcribed text through the normal agent pipeline
     business = db.query(Business).filter(Business.id == call.business_id).first()
     business_name = business.name if business else "Our Business"
-    tools = ReceptionistTools(db=db, business_id=call.business_id, call_id=call.id)
-    agent = GeminiReceptionistAgent(business_name=business_name, tools=tools)
+    tools = ReceptionistTools(db=db, business_id=call.business_id, call_id=call.id, caller_number=call.caller_number)
+    agent = GeminiReceptionistAgent(business_name=business_name, tools=tools, caller_number=call.caller_number)
     history = list(call.transcript or [])
 
     turn_result = await run_in_threadpool(

@@ -6,10 +6,21 @@ from app.services.enquiry_service import EnquiryService
 
 class ReceptionistTools:
 
-    def __init__(self, db: Session, business_id: str, call_id: str | None = None):
+    def __init__(self, db: Session, business_id: str, call_id: str | None = None, caller_number: str | None = None):
         self.db = db
         self.business_id = business_id
         self.call_id = call_id
+        self._caller_number = caller_number
+
+    def get_caller_number(self) -> str | None:
+        if self._caller_number:
+            return self._caller_number
+        if self.call_id:
+            from app.models.receptionist import Call
+            call = self.db.query(Call).filter(Call.id == self.call_id).first()
+            if call and call.caller_number:
+                return call.caller_number
+        return None
 
     def search_faq(self, query: str) -> dict:
         results = KnowledgeService.search_static(self.db, self.business_id, query)
