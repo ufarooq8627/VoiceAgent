@@ -12,6 +12,7 @@ from app.database import get_db
 from app.models.receptionist import Business, Call
 from app.models.client_api_key import ClientApiKey
 from app.services.widget_token_service import mint_widget_session_token, verify_widget_session_token
+from app.services.voice_synthesis_service import format_speech_payload
 from app.agent.receptionist_agent import GeminiReceptionistAgent
 from app.agent.receptionist_tools import ReceptionistTools
 from app.limiter import limiter
@@ -146,6 +147,7 @@ async def widget_text_turn(
 
     return {
         "reply_text": agent_result.spoken_response,
+        "speech_text": format_speech_payload(agent_result.spoken_response),
         "action": "reply",
         "tools_invoked": agent_result.tools_invoked,
         "metadata": agent_result.meta
