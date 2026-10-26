@@ -1,4 +1,12 @@
+import asyncio
 from starlette.concurrency import run_in_threadpool
+
+_call_locks: dict[str, asyncio.Lock] = {}
+
+def _get_call_lock(call_id: str) -> asyncio.Lock:
+    if call_id not in _call_locks:
+        _call_locks[call_id] = asyncio.Lock()
+    return _call_locks[call_id]
 from app.agent.receptionist_agent import get_gemini_client
 import uuid
 import tempfile
@@ -102,23 +110,30 @@ async def process_turn(request: Request, call_id: str, payload: CallTurnRequest,
         caller_message=payload.caller_message,
     )
 
-    new_transcript = list(call.transcript or [])
-    new_transcript.append({
-        "role": "caller",
-        "content": payload.caller_message,
-        "timestamp": datetime.now(timezone.utc).isoformat(),
-    })
-    agent_entry = {
-        "role": "agent",
-        "content": turn_result.spoken_response,
-        "timestamp": datetime.now(timezone.utc).isoformat(),
-        "tools_called": turn_result.tools_invoked,
-    }
-    if turn_result.meta:
-        agent_entry["meta"] = turn_result.meta
-    new_transcript.append(agent_entry)
-    call.transcript = new_transcript
-    db.commit()
+    async with _get_call_lock(call_id):
+        # Expire session cache to read latest committed transcript from DB
+        db.expire_all()
+        call = db.query(Call).filter(Call.id == call_id).first()
+        if not call or call.outcome != "in_progress":
+            raise HTTPException(status_code=409, detail="Call has ended or is no longer in progress.")
+
+        new_transcript = list(call.transcript or [])
+        new_transcript.append({
+            "role": "caller",
+            "content": payload.caller_message,
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+        })
+        agent_entry = {
+            "role": "agent",
+            "content": turn_result.spoken_response,
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "tools_called": turn_result.tools_invoked,
+        }
+        if turn_result.meta:
+            agent_entry["meta"] = turn_result.meta
+        new_transcript.append(agent_entry)
+        call.transcript = new_transcript
+        db.commit()
 
     return {
         "call_id": call.id,
@@ -186,25 +201,30 @@ async def process_audio_turn(
         caller_message=transcript_text.strip(),
     )
 
-    # Update transcript
-    new_transcript = list(call.transcript or [])
-    new_transcript.append({
-        "role": "caller",
-        "content": transcript_text.strip(),
-        "timestamp": datetime.now(timezone.utc).isoformat(),
-        "source": "voice_mic",
-    })
-    agent_entry = {
-        "role": "agent",
-        "content": turn_result.spoken_response,
-        "timestamp": datetime.now(timezone.utc).isoformat(),
-        "tools_called": turn_result.tools_invoked,
-    }
-    if turn_result.meta:
-        agent_entry["meta"] = turn_result.meta
-    new_transcript.append(agent_entry)
-    call.transcript = new_transcript
-    db.commit()
+    async with _get_call_lock(call_id):
+        db.expire_all()
+        call = db.query(Call).filter(Call.id == call_id).first()
+        if not call or call.outcome != "in_progress":
+            raise HTTPException(status_code=409, detail="Call has ended or is no longer in progress.")
+
+        new_transcript = list(call.transcript or [])
+        new_transcript.append({
+            "role": "caller",
+            "content": transcript_text.strip(),
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "source": "voice_mic",
+        })
+        agent_entry = {
+            "role": "agent",
+            "content": turn_result.spoken_response,
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "tools_called": turn_result.tools_invoked,
+        }
+        if turn_result.meta:
+            agent_entry["meta"] = turn_result.meta
+        new_transcript.append(agent_entry)
+        call.transcript = new_transcript
+        db.commit()
 
     return {
         "call_id": call.id,
@@ -273,6 +293,7 @@ def end_call(call_id: str, payload: EndCallRequest, db: Session = Depends(get_db
     if not call:
         raise HTTPException(status_code=404, detail="Call not found.")
 
+    _call_locks.pop(call_id, None)
     call.outcome = "completed"
     call.ended_at = datetime.now(timezone.utc)
     if payload.summary:
