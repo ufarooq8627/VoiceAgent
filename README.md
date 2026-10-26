@@ -298,3 +298,32 @@ ngrok http 8000
 * **Credential Hygiene**: Git tracking ignores `.env`, SQLite database files, and sensitive keys.
 
 * **Authentication**: All management and simulation routes require valid session authentication.
+
+---
+
+## Phase 9: Commercial B2B Embeddable Voice Widget & Client API
+
+### 1-Line Client Website Integration
+Clients can embed the Voice Agent on any external website (Shopify, WordPress, Webflow, custom React/Vue/HTML) with zero build tools:
+
+```html
+<!-- Divine Embeddable Voice Receptionist Widget -->
+<script src="https://your-domain.com/static/widget/voice-widget.js" 
+        data-client-key="pk_live_your_public_key_here" 
+        data-position="bottom-right" 
+        data-theme="dark" defer></script>
+```
+
+### Public Widget Gateway (`/api/v1/widget/*`)
+* `POST /api/v1/widget/session`: Origin-whitelisted handshake returning ephemeral signed HMAC session tokens.
+* `POST /api/v1/widget/call/start`: Starts real-time caller session inside isolated Shadow DOM.
+* `POST /api/v1/widget/call/{call_id}/turn`: Multiturn conversation answering FAQs using real-time RAG.
+* `POST /api/v1/widget/call/{call_id}/end`: Gracefully terminates call session and records conversation outcome.
+
+### Client B2B Management API (`/api/v1/client/*`)
+* `POST /api/v1/client/knowledge/sync`: Allows clients to programmatically synchronize FAQs from their CMS via `X-Client-Secret`.
+* `GET /api/v1/client/leads`: Returns customer callback requests and unanswered inquiries for business follow-up.
+
+### Live Simulation Demo
+Experience the live client store integration simulation at:
+`http://127.0.0.1:8000/demo/embed`
