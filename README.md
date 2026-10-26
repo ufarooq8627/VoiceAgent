@@ -327,3 +327,41 @@ Clients can embed the Voice Agent on any external website (Shopify, WordPress, W
 ### Live Simulation Demo
 Experience the live client store integration simulation at:
 `http://127.0.0.1:8000/demo/embed`
+
+
+---
+
+## Phase 10: Client Self-Service Portal, Metering & Webhooks
+
+Phase 10 provides full SaaS maturity, allowing business clients to self-manage their voice agent, monitor live calls, receive instant webhook alerts, and configure branding without developer intervention.
+
+### 1. Client Tenant Portal (`/portal`)
+Business clients authenticate securely using their Secret Key (`sk_live_...`):
+* **Login & Auth**: `/portal/login` - Secure cookie-based session with origin domain whitelist management.
+* **Dashboard Overview**: `/portal` - Real-time metrics on total calls, callback requests, average call duration, quota progress, and embed tag snippet generator.
+* **Knowledge Base Manager**: `/portal/knowledge` - Self-service CRUD interface for clients to add, edit, or delete custom FAQs and business policies.
+* **Call Transcripts & History**: `/portal/calls` - Detailed call logs with caller number, duration, call status, and full transcript review.
+* **Actionable Leads Inbox**: `/portal/leads` - Direct access to captured customer callback requests with notes, timestamps, and follow-up status.
+
+### 2. SaaS Usage Metering & Quota Enforcement
+* **Automated Tracking**: Tracks monthly call counts per client in `ClientUsage` table.
+* **Hard Quota Enforcement**: If a client exhausts their monthly limit, `/api/v1/widget/call/start` instantly blocks further sessions returning `HTTP 429 Too Many Requests` with payload:
+  ```json
+  {
+    "detail": "Monthly call quota exceeded. Please upgrade your plan."
+  }
+  ```
+
+### 3. Real-Time Lead Webhook Dispatcher
+* **Instant Delivery**: Whenever a caller requests a callback or inquiry lead, an asynchronous webhook is dispatched to the client's CRM/Slack endpoint.
+* **HMAC SHA-256 Signatures**: Every payload includes `X-Voice-Signature: sha256=<hex_digest>` computed using the client's secret key for tamper-proof payload validation.
+* **SSRF Protection**: Private IPs (`127.0.0.1`, `10.x.x.x`, `192.168.x.x`, `localhost`) are strictly blocked.
+* **Resilient**: Requests enforce a 3.0-second timeout to prevent voice turn degradation.
+
+### 4. Dynamic Widget Customization
+* **Branding Control**: Clients can customize `brand_color` (hex code) and `custom_greeting` in their portal settings.
+* **Dynamic Config Gateway**:
+  ```http
+  GET /api/v1/widget/config?client_key=pk_live_your_key
+  ```
+  Returns customized theme properties directly to the embedded Shadow DOM widget without requiring clients to touch their website code.
