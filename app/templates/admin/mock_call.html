@@ -252,35 +252,197 @@ let testMicTimeout = null;
 let currentTurnController = null;
 let currentTurnId = 0;
 
+let currentUtteranceQueue = [];
+let bargeInLoopId = null;
+let bargeInBaselineRMS = 0.02;
+let bargeInThreshold = 0.05;
+let continuousSpeechMs = 0;
+let speechPlaybackStartMs = 0;
+let lastVadCheckMs = 0;
+
+function stopBargeInWatcher() {
+    if (bargeInLoopId) {
+        cancelAnimationFrame(bargeInLoopId);
+        bargeInLoopId = null;
+    }
+    continuousSpeechMs = 0;
+}
+
+function startBargeInWatcher() {
+    stopBargeInWatcher();
+    if (!analyser || !micStream) {
+        initMicStream().catch(e => console.warn("Mic init for barge-in skipped:", e));
+    }
+    
+    speechPlaybackStartMs = performance.now();
+    lastVadCheckMs = performance.now();
+    let baselineAccumulator = 0;
+    let baselineSampleCount = 0;
+    let calibrationDone = false;
+    bargeInBaselineRMS = 0.02;
+    bargeInThreshold = 0.05;
+    continuousSpeechMs = 0;
+
+    const timeDomainBuffer = new Float32Array(analyser ? analyser.fftSize : 256);
+
+    function checkVad() {
+        if (!isAgentSpeaking) {
+            stopBargeInWatcher();
+            return;
+        }
+
+        const now = performance.now();
+        const elapsedSincePlayback = now - speechPlaybackStartMs;
+        const deltaMs = Math.min(100, Math.max(1, now - lastVadCheckMs));
+        lastVadCheckMs = now;
+
+        if (analyser && micStream) {
+            analyser.getFloatTimeDomainData(timeDomainBuffer);
+            let sumSquares = 0;
+            for (let i = 0; i < timeDomainBuffer.length; i++) {
+                sumSquares += timeDomainBuffer[i] * timeDomainBuffer[i];
+            }
+            const rms = Math.sqrt(sumSquares / timeDomainBuffer.length);
+
+            // Calibration in first 350ms of agent speech (noise floor baseline)
+            if (elapsedSincePlayback < 350) {
+                baselineAccumulator += rms;
+                baselineSampleCount++;
+            } else if (!calibrationDone) {
+                calibrationDone = true;
+                if (baselineSampleCount > 0) {
+                    bargeInBaselineRMS = Math.max(0.015, baselineAccumulator / baselineSampleCount);
+                }
+                bargeInThreshold = Math.max(0.04, bargeInBaselineRMS * 2.5);
+                console.log(`[Barge-In] Calibration complete. Baseline RMS: ${bargeInBaselineRMS.toFixed(4)}, Threshold: ${bargeInThreshold.toFixed(4)}`);
+            } else {
+                // Active barge-in detection window (after 350ms calibration)
+                if (rms > bargeInThreshold) {
+                    continuousSpeechMs += deltaMs;
+                    if (continuousSpeechMs >= 250) {
+                        console.log(`[Barge-In] Caller interruption detected! RMS: ${rms.toFixed(4)} > ${bargeInThreshold.toFixed(4)} for ${continuousSpeechMs.toFixed(0)}ms. Cancelling TTS.`);
+                        triggerBargeIn(rms);
+                        return;
+                    }
+                } else {
+                    continuousSpeechMs = Math.max(0, continuousSpeechMs - (deltaMs * 0.5));
+                }
+            }
+        }
+
+        bargeInLoopId = requestAnimationFrame(checkVad);
+    }
+
+    bargeInLoopId = requestAnimationFrame(checkVad);
+}
+
+function triggerBargeIn(triggerRms = 0) {
+    stopBargeInWatcher();
+    currentUtteranceQueue = [];
+    isAgentSpeaking = false;
+
+    if ('speechSynthesis' in window) {
+        window.speechSynthesis.cancel();
+    }
+
+    const visualizer = document.getElementById("audio-visualizer");
+    if (visualizer) visualizer.style.display = "none";
+
+    setVoiceStatus("? Interrupted by Caller", "#f59e0b", false);
+    showMicNotice("? Interrupted: Agent stopped speaking because you interrupted. Speak now!", false);
+
+    // Turn gating: invalidate any inflight agent responses
+    if (currentTurnController) {
+        currentTurnController.abort();
+    }
+    currentTurnId++;
+
+    // If call is still active and not currently recording, auto-start mic recording
+    if (currentCallId && !isRecording) {
+        console.log("[Barge-In] Auto-opening microphone for caller response...");
+        toggleVoiceInput();
+    }
+}
+
 function toggleAudio() {
     audioEnabled = !audioEnabled;
     document.getElementById("tts-status").innerText = audioEnabled ? "ON" : "OFF";
-    if (!audioEnabled && ('speechSynthesis' in window)) {
-        window.speechSynthesis.cancel();
+    if (!audioEnabled) {
+        stopBargeInWatcher();
+        currentUtteranceQueue = [];
+        isAgentSpeaking = false;
+        if ('speechSynthesis' in window) {
+            window.speechSynthesis.cancel();
+        }
     }
 }
 
 function speakText(text) {
-    if (!audioEnabled || !('speechSynthesis' in window)) return;
+    if (!audioEnabled || !('speechSynthesis' in window) || !text) return;
+    
+    // Cancel any previous utterances and watchers
     window.speechSynthesis.cancel();
-    const utterance = new SpeechSynthesisUtterance(text);
-    utterance.rate = 1.0;
-    utterance.pitch = 1.0;
-    utterance.onstart = () => {
-        isAgentSpeaking = true;
-        document.getElementById("audio-visualizer").style.display = "block";
-        setVoiceStatus("AI Receptionist Speaking...", "#38bdf8", true);
-    };
-    utterance.onend = () => {
-        isAgentSpeaking = false;
-        document.getElementById("audio-visualizer").style.display = "none";
-        setVoiceStatus("Ready for your turn", "#94a3b8", false);
-    };
-    utterance.onerror = () => {
-        isAgentSpeaking = false;
-        document.getElementById("audio-visualizer").style.display = "none";
-    };
-    window.speechSynthesis.speak(utterance);
+    stopBargeInWatcher();
+    currentUtteranceQueue = [];
+
+    // Split text into sentences to avoid browser truncation & enable sentence-level interruption
+    const sentences = text.match(/[^.!?]+[.!?]+|[^.!?]+$/g) || [text];
+    currentUtteranceQueue = sentences.map(s => s.trim()).filter(s => s.length > 0);
+
+    if (currentUtteranceQueue.length === 0) return;
+
+    isAgentSpeaking = true;
+    const visualizer = document.getElementById("audio-visualizer");
+    if (visualizer) visualizer.style.display = "block";
+    setVoiceStatus("AI Receptionist Speaking...", "#38bdf8", true);
+
+    // Start open-mic barge-in watcher
+    startBargeInWatcher();
+
+    function playNextSentence() {
+        if (!isAgentSpeaking || currentUtteranceQueue.length === 0) {
+            isAgentSpeaking = false;
+            stopBargeInWatcher();
+            if (visualizer) visualizer.style.display = "none";
+            setVoiceStatus("Ready for your turn", "#94a3b8", false);
+            return;
+        }
+
+        const sentence = currentUtteranceQueue.shift();
+        const utterance = new SpeechSynthesisUtterance(sentence);
+        utterance.rate = 1.0;
+        utterance.pitch = 1.0;
+
+        utterance.onend = () => {
+            if (currentUtteranceQueue.length > 0 && isAgentSpeaking) {
+                playNextSentence();
+            } else {
+                isAgentSpeaking = false;
+                stopBargeInWatcher();
+                if (visualizer) visualizer.style.display = "none";
+                setVoiceStatus("Ready for your turn", "#94a3b8", false);
+            }
+        };
+
+        utterance.onerror = (e) => {
+            if (e.error === 'interrupted' || e.error === 'canceled') {
+                isAgentSpeaking = false;
+                stopBargeInWatcher();
+                if (visualizer) visualizer.style.display = "none";
+            } else if (currentUtteranceQueue.length > 0 && isAgentSpeaking) {
+                playNextSentence();
+            } else {
+                isAgentSpeaking = false;
+                stopBargeInWatcher();
+                if (visualizer) visualizer.style.display = "none";
+                setVoiceStatus("Ready for your turn", "#94a3b8", false);
+            }
+        };
+
+        window.speechSynthesis.speak(utterance);
+    }
+
+    playNextSentence();
 }
 
 function setVoiceStatus(msg, color, pulsing) {
@@ -354,7 +516,7 @@ async function initMicStream(forceNew = false) {
             micStream = await navigator.mediaDevices.getUserMedia(constraints);
             const source = audioCtx.createMediaStreamSource(micStream);
             analyser = audioCtx.createAnalyser();
-            analyser.fftSize = 64;
+            analyser.fftSize = 256;
             analyser.smoothingTimeConstant = 0.5;
             source.connect(analyser);
 
@@ -631,6 +793,9 @@ async function endCall() {
             try { audioCtx.close(); } catch(e){}
             audioCtx = null;
         }
+        stopBargeInWatcher();
+        currentUtteranceQueue = [];
+        isAgentSpeaking = false;
         if ('speechSynthesis' in window) window.speechSynthesis.cancel();
 
         const res = await fetch('/api/receptionist/calls/' + currentCallId + '/end', {
