@@ -122,3 +122,21 @@ def test_is_adversarial_prompt_detection():
     ]
     for q in legit:
         assert is_adversarial_prompt(q) is False, f"False positive on: {q}"
+
+
+from app.services.rag_service import _EMBEDDING_CACHE, RAGService
+
+
+def test_embedding_cache_bounded_lru():
+    _EMBEDDING_CACHE.clear()
+
+    # Fill cache beyond limit (505 items)
+    for i in range(505):
+        key = f"item_{i}"
+        RAGService._cache_put(key, [0.1] * 10)
+
+    assert len(_EMBEDDING_CACHE) == 500, f"Expected cache capped at 500, but got {len(_EMBEDDING_CACHE)}"
+    # Verify oldest keys (0, 1, 2, 3, 4) were evicted
+    assert "item_0" not in _EMBEDDING_CACHE
+    assert "item_4" not in _EMBEDDING_CACHE
+    assert "item_504" in _EMBEDDING_CACHE

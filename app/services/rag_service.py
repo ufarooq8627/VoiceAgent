@@ -8,8 +8,11 @@ from sqlalchemy import or_
 from app.models.receptionist import KnowledgeItem
 from app.config import settings
 
-# In-memory vector cache: item_id -> list of float embeddings
-_EMBEDDING_CACHE: Dict[str, List[float]] = {}
+from collections import OrderedDict
+
+# Bounded in-memory vector cache (LRU): item_id -> list of float embeddings
+MAX_EMBEDDING_CACHE_SIZE = 500
+_EMBEDDING_CACHE: OrderedDict[str, List[float]] = OrderedDict()
 
 
 def _cosine_similarity(vec_a: List[float], vec_b: List[float]) -> float:
@@ -29,6 +32,21 @@ class RAGService:
     Semantic Retrieval-Augmented Generation (RAG) Service
     powered by Gemini Embeddings.
     """
+
+    @classmethod
+    def _cache_get(cls, key: str) -> Optional[List[float]]:
+        if key in _EMBEDDING_CACHE:
+            _EMBEDDING_CACHE.move_to_end(key)
+            return _EMBEDDING_CACHE[key]
+        return None
+
+    @classmethod
+    def _cache_put(cls, key: str, embedding: List[float]):
+        if key in _EMBEDDING_CACHE:
+            _EMBEDDING_CACHE.move_to_end(key)
+        _EMBEDDING_CACHE[key] = embedding
+        if len(_EMBEDDING_CACHE) > MAX_EMBEDDING_CACHE_SIZE:
+            _EMBEDDING_CACHE.popitem(last=False)
 
     @classmethod
     def get_embedding(cls, text: str) -> Optional[List[float]]:
@@ -86,13 +104,12 @@ class RAGService:
             for item in items:
                 # Check cache for item embedding
                 cache_key = f"{item.id}_{item.question}"
-                if cache_key not in _EMBEDDING_CACHE:
+                item_emb = cls._cache_get(cache_key)
+                if item_emb is None:
                     item_text = f"Question: {item.question}\nAnswer: {item.answer}"
                     item_emb = cls.get_embedding(item_text)
                     if item_emb:
-                        _EMBEDDING_CACHE[cache_key] = item_emb
-
-                item_emb = _EMBEDDING_CACHE.get(cache_key)
+                        cls._cache_put(cache_key, item_emb)
                 if item_emb:
                     score = _cosine_similarity(query_embedding, item_emb)
                     if score >= threshold:
