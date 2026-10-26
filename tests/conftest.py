@@ -87,3 +87,19 @@ def invited_candidate(db_session):
 
 from app.limiter import limiter
 limiter.enabled = False
+
+from starlette.testclient import TestClient
+from app.main import app
+from app.database import get_db
+
+@pytest.fixture
+def client(db_session):
+    def override_get_db():
+        try:
+            yield db_session
+        finally:
+            pass
+    app.dependency_overrides[get_db] = override_get_db
+    with TestClient(app) as test_client:
+        yield test_client
+    app.dependency_overrides.clear()
