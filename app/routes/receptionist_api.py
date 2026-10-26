@@ -1,4 +1,6 @@
 import asyncio
+import logging
+logger = logging.getLogger(__name__)
 from starlette.concurrency import run_in_threadpool
 
 _call_locks: dict[str, asyncio.Lock] = {}
@@ -177,8 +179,8 @@ async def process_audio_turn(
         raise HTTPException(status_code=400, detail="Audio too short or empty.")
 
     # Transcribe using Gemini
-    transcript_text = await _transcribe_audio_with_gemini(audio_bytes, audio.content_type or "audio/webm")
-    if not transcript_text or transcript_text.strip() == "":
+    stt_status, transcript_text = await _transcribe_audio_with_gemini(audio_bytes, audio.content_type or "audio/webm")
+    if stt_status == "no_speech":
         return {
             "call_id": call.id,
             "transcription": "",
@@ -186,8 +188,18 @@ async def process_audio_turn(
             "tools_called": [],
             "actions_taken": [],
             "silence_detected": True,
+            "stt_status": "no_speech",
         }
-
+    elif stt_status == "error":
+        return {
+            "call_id": call.id,
+            "transcription": "",
+            "reply_text": "I had trouble processing that audio. Please try speaking again.",
+            "tools_called": [],
+            "actions_taken": [],
+            "error_detected": True,
+            "stt_status": "error",
+        }
     # Now process the transcribed text through the normal agent pipeline
     business = db.query(Business).filter(Business.id == call.business_id).first()
     business_name = business.name if business else "Our Business"
@@ -236,14 +248,22 @@ async def process_audio_turn(
     }
 
 
-async def _transcribe_audio_with_gemini(audio_bytes: bytes, mime_type: str) -> str:
-    """Use Gemini multimodal API to transcribe audio bytes to text with anti-hallucination guard."""
+async def _transcribe_audio_with_gemini(audio_bytes: bytes, mime_type: str) -> tuple[str, str]:
+    """
+    Use Gemini multimodal API to transcribe audio bytes to text with anti-hallucination guard.
+    Returns (status, text):
+      - ("speech", cleaned_text)
+      - ("no_speech", "")
+      - ("error", "")
+    """
     try:
         from google.genai import types
 
         client = get_gemini_client()
         model_name = settings.llm_model or "gemini-3.5-flash-lite"
-        print(f"[Gemini STT] Sending {len(audio_bytes)} bytes ({mime_type}) to {model_name}...")
+        timeout_ms = int(getattr(settings, "llm_timeout_seconds", 20) * 1000)
+
+        logger.info("Gemini STT request: bytes=%d mime=%s model=%s", len(audio_bytes), mime_type, model_name)
 
         response = await run_in_threadpool(
             client.models.generate_content,
@@ -272,19 +292,22 @@ async def _transcribe_audio_with_gemini(audio_bytes: bytes, mime_type: str) -> s
             ],
             config=types.GenerateContentConfig(
                 temperature=0.0,
+                http_options=types.HttpOptions(timeout=timeout_ms),
             ),
         )
         raw_text = (response.text or "").strip()
-        print(f"[Gemini STT Output] Raw: {repr(raw_text)}")
 
         if not raw_text or "NO_SPEECH" in raw_text.upper():
-            return ""
+            return "no_speech", ""
 
-        # Remove surrounding quotes or punctuation artifacts if present
-        return raw_text.strip(" '\"\n\r")
+        cleaned = raw_text.strip(" '\"\n\r")
+        if not cleaned:
+            return "no_speech", ""
+
+        return "speech", cleaned
     except Exception as e:
-        print(f"[Gemini STT Error] {e}")
-        return ""
+        logger.error("Gemini STT error: %s", type(e).__name__)
+        return "error", ""
 
 
 @router.post("/api/receptionist/calls/{call_id}/end")
