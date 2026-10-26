@@ -38,6 +38,16 @@ class Settings(BaseSettings):
             raise ValueError("LLM_API_KEY must be set when LLM_PROVIDER is 'gemini'")
         return self
 
+    @model_validator(mode="after")
+    def validate_production_security(self):
+        if self.is_production:
+            insecure_keys = ("change-me", "default", "secret", "", "change-me-to-a-secure-random-64-character-string")
+            if self.app_secret_key in insecure_keys:
+                raise ValueError("APP_SECRET_KEY must be set to a secure random value in production")
+            if not self.admin_password_hash and not self.admin_password:
+                raise ValueError("ADMIN_PASSWORD_HASH or ADMIN_PASSWORD must be set in production")
+        return self
+
     model_config = {"env_file": ".env", "env_file_encoding": "utf-8", "extra": "ignore"}
 
 

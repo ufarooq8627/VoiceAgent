@@ -2,7 +2,7 @@
 
 An intelligent, multi-tenant AI voice receptionist and hiring workflow agent built with **FastAPI**, **Google Gemini multimodal LLM**, and production-grade **telephony architecture for Twilio & Telnyx**.
 
-Designed for zero-latency, realistic voice interaction with live tool execution, dynamic FAQ lookup, unanswered question logging with staff escalation, and callback consent tracking.
+Designed for HTTP-based voice interaction with server-side Gemini transcription, live tool execution, dynamic FAQ lookup, unanswered question logging with staff escalation, and callback consent tracking.
 
 ---
 
@@ -97,6 +97,12 @@ cp .env.example .env
 
 Open `.env` and fill in your Gemini API key:
 ```env
+# Admin Credentials (set a password for development or bcrypt hash for production)
+ADMIN_USERNAME=admin
+ADMIN_PASSWORD=your_secure_password
+# Or generate a hash: python scripts/set_admin_password.py YOUR_PASSWORD
+
+# Gemini AI / LLM Configuration
 LLM_PROVIDER=gemini
 LLM_API_KEY=your_gemini_api_key_here
 LLM_MODEL=gemini-3.5-flash-lite
