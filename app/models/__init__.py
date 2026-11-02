@@ -30,3 +30,8 @@ from app.models.receptionist import (
     Business, BusinessPhoneNumber, KnowledgeItem, LiveDataSource,
     Call, UnansweredEnquiry, CallbackRequest, OwnerNotification
 )
+from app.models.outbound import (
+    OutboundCampaign, OutboundContact, OutboundConsent, OutboundSuppression,
+    OutboundVoicemailAsset, OutboundCampaignRecipient, OutboundCallAttempt,
+    OutboundCallEvent, OutboundOptOutNumber,
+)

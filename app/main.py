@@ -5,12 +5,15 @@ from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware.sessions import SessionMiddleware
+from alembic.config import Config as AlembicConfig
+from alembic.runtime.migration import MigrationContext
+from alembic.script import ScriptDirectory
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 
 from app.config import settings
 from app.database import Base, engine
-from app.routes import auth, admin, public, api, receptionist_api, receptionist_admin, telephony_api, widget_api, client_api, portal_auth, portal_knowledge, portal_leads
+from app.routes import auth, admin, public, api, receptionist_api, receptionist_admin, telephony_api, widget_api, client_api, portal_auth, portal_knowledge, portal_leads, outbound_admin, outbound_telephony
 from app.agent.worker import start_scheduler, stop_scheduler
 from app.limiter import limiter
 
@@ -18,9 +21,25 @@ from app.limiter import limiter
 import logging
 logger = logging.getLogger("app.main")
 
+
+def _require_current_schema():
+    alembic_ini = Path(__file__).resolve().parents[1] / "alembic.ini"
+    script = ScriptDirectory.from_config(AlembicConfig(str(alembic_ini)))
+    expected_heads = set(script.get_heads())
+    with engine.connect() as connection:
+        current_heads = set(MigrationContext.configure(connection).get_current_heads())
+    if current_heads != expected_heads:
+        raise RuntimeError("Database migrations are missing or out of date; run 'alembic upgrade head' before starting the production app.")
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    Base.metadata.create_all(bind=engine)
+    # Production schema changes are applied before startup with Alembic.
+    # Keep create_all for local development only; it does not migrate existing schemas.
+    if not settings.is_production:
+        Base.metadata.create_all(bind=engine)
+    else:
+        _require_current_schema()
     if settings.is_production and settings.app_secret_key in ("change-me", "default", "secret", ""):
         logger.warning("[CRITICAL SECURITY WARNING] APP_SECRET_KEY is using a default insecure value! Set a random 32+ char key in .env.")
     if settings.is_production and not settings.admin_password_hash:
@@ -71,6 +90,8 @@ app.include_router(client_api.router)
 app.include_router(portal_auth.router)
 app.include_router(portal_knowledge.router)
 app.include_router(portal_leads.router)
+app.include_router(outbound_admin.router)
+app.include_router(outbound_telephony.router)
 
 
 @app.get("/health")

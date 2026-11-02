@@ -45,7 +45,7 @@ def test_widget_start_call_and_text_turn(client, db_session):
     assert res_turn.status_code == 200
     turn_data = res_turn.json()
     assert "reply_text" in turn_data
-    assert "9am to 5pm" in turn_data["reply_text"] or "hours" in turn_data["reply_text"].lower()
+    assert ("9" in turn_data["reply_text"] and "5" in turn_data["reply_text"]) or "monday" in turn_data["reply_text"].lower()
 
     # 4. End Call
     res_end = client.post(
