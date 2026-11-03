@@ -2,7 +2,7 @@ import pytest
 from app.models.receptionist import Business
 from app.models.client_api_key import ClientApiKey, generate_client_keys
 from app.models.client_usage import ClientUsage
-from app.services.usage_meter_service import check_and_increment_usage
+from app.services.usage_meter_service import check_and_increment_usage, get_current_period
 
 def test_usage_meter_blocks_at_quota(db_session):
     biz = Business(name="Capped Clinic")
@@ -46,7 +46,7 @@ def test_widget_call_start_returns_429_when_quota_exceeded(client, db_session):
 
     pub, sec, sec_hash = generate_client_keys()
     key = ClientApiKey(business_id=biz.id, public_key=pub, secret_key_hash=sec_hash, allowed_origins=["*"])
-    usage = ClientUsage(business_id=biz.id, billing_period="2026-10", calls_used=50, quota_limit=50)
+    usage = ClientUsage(business_id=biz.id, billing_period=get_current_period(), calls_used=50, quota_limit=50)
     db_session.add_all([key, usage])
     db_session.commit()
 
